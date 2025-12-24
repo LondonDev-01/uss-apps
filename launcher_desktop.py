@@ -409,10 +409,40 @@ class HorarioAppProfesional:
         # Dibujar clases SOBRE el grid
         colors = ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED', '#DB2777', '#0891B2', '#F59E0b']
         self.mapa_colores_actual = {}
-        
+        # Mapeo por título para asegurar mismos tonos base entre TEO/LAB del mismo ramo
+        title_base = {}
+
+        def hex_to_rgb(h: str):
+            h = h.lstrip('#')
+            return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+        def rgb_to_hex(rgb):
+            return '#%02x%02x%02x' % (max(0, min(255, int(rgb[0]))), max(0, min(255, int(rgb[1]))), max(0, min(255, int(rgb[2]))))
+
+        def adjust_brightness(hexcol: str, factor: float):
+            r, g, b = hex_to_rgb(hexcol)
+            return rgb_to_hex((r * factor, g * factor, b * factor))
+
+        # Asignar color base por título
         for c in cls:
+            if c.titulo not in title_base:
+                title_base[c.titulo] = colors[len(title_base) % len(colors)]
+
+        # Asignar color por NRC basado en tipo (TEO claro, LAB oscuro)
+        for c in cls:
+            base = title_base.get(c.titulo, colors[0])
+            tipo_up = (c.tipo or '').upper()
+            tipo_norm = 'TEO' if ('TEOR' in tipo_up or 'TEO' in tipo_up) else 'LAB' if ('LAB' in tipo_up or 'TALLER' in tipo_up or 'PRACT' in tipo_up) else 'OTRO'
+            
+            if tipo_norm == 'TEO':
+                tone = adjust_brightness(base, 1.25)
+            elif tipo_norm == 'LAB':
+                tone = adjust_brightness(base, 0.8)
+            else:
+                tone = base
+            
             if c.nrc not in self.mapa_colores_actual:
-                self.mapa_colores_actual[c.nrc] = colors[len(self.mapa_colores_actual) % len(colors)]
+                self.mapa_colores_actual[c.nrc] = tone
             
             try:
                 # Parsear horas
@@ -454,8 +484,11 @@ class HorarioAppProfesional:
             seen.add(c.nrc)
             lf = ctk.CTkFrame(self.legend_c, fg_color=("gray88", "gray28"), corner_radius=8)
             lf.pack(fill="x", pady=4, padx=5)
+            # Mostrar color y tipo (TEO/LAB)
+            tipo_up = (c.tipo or '').upper()
+            tipo_norm = 'TEO' if ('TEOR' in tipo_up or 'TEO' in tipo_up) else 'LAB' if ('LAB' in tipo_up or 'TALLER' in tipo_up or 'PRACT' in tipo_up) else 'OTRO'
             ctk.CTkLabel(lf, text="", width=14, height=14, fg_color=self.mapa_colores_actual[c.nrc], corner_radius=7).pack(side="left", padx=10, pady=8)
-            ctk.CTkLabel(lf, text=f"{c.titulo}\nNRC: {c.nrc}", font=("Inter", 10), justify="left").pack(side="left", pady=8)
+            ctk.CTkLabel(lf, text=f"{c.titulo} ({tipo_norm})\nNRC: {c.nrc}", font=("Inter", 10), justify="left").pack(side="left", pady=8)
 
     # --- EXPORT ---
     def setup_tab_export(self):

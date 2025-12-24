@@ -86,7 +86,8 @@ class OptimizadorReal:
 
         for nrc, blocks in nrc_blocks.items():
             base = blocks[0]
-            tipo_norm = "TEO" if "TEOR" in base.tipo.upper() else "LAB" if ("LAB" in base.tipo.upper() or "TALLER" in base.tipo.upper() or "PRACT" in base.tipo.upper()) else "OTRO"
+            tipo_up = (base.tipo or '').upper()
+            tipo_norm = "TEO" if ("TEOR" in tipo_up or "TEO" in tipo_up) else "LAB" if ("LAB" in tipo_up or "TALLER" in tipo_up or "PRACT" in tipo_up) else "OTRO"
             ramos_por_prioridad[base.prioridad][base.titulo][tipo_norm].append(blocks)
 
         # 2. Construir UNA lista de opciones por RAMO (que pueden ser TEO+LAB)
@@ -135,16 +136,17 @@ class OptimizadorReal:
                                     opts_este_ramo.append(combo)
                 
                 # Si no se pudieron emparejar:
-                # - Si existen TEO(s), NO añadir opciones sólo LAB: al menos debe aparecer el TEO.
-                #   Por tanto añadimos cada TEO por separado (fallback) para garantizar que
-                #   el generador intente incluir el TEO aunque no haya pairing válido.
-                # - Si no existen TEO, entonces añadimos LAB/OTRO como opciones individuales.
+                # - Modo ESTRICTO: si existen TEO y LAB para el mismo título,
+                #   NO añadimos opciones individuales aquí: sólo las combinaciones
+                #   TEO+LAB son válidas. Si no hay combos válidos, este título quedará
+                #   sin opciones y el generador indicará que no hay horarios posibles.
+                # - Si NO existen ambos tipos, agregamos las opciones individuales disponibles.
                 if not opts_este_ramo:
-                    if "TEO" in tipos:
-                        for teo_blocks in tipos["TEO"]:
-                            opts_este_ramo.append(teo_blocks)
+                    if "TEO" in tipos and "LAB" in tipos:
+                        # No agregar fallback individual: dejamos opts_este_ramo vacío
+                        opts_este_ramo = []
                     else:
-                        for t_key in ["LAB", "OTRO"]:
+                        for t_key in ["TEO", "LAB", "OTRO"]:
                             if t_key in tipos:
                                 for blocks in tipos[t_key]:
                                     opts_este_ramo.append(blocks)
@@ -200,7 +202,9 @@ class OptimizadorReal:
             es_valido, msg_conflicto = self.verificar_conflictos_detallado(horario_plano)
             if es_valido:
                 n_nrcs = len(set(c.nrc for c in horario_plano))
-                puntaje = self._calcular_puntaje(horario_plano, preferencias) + (n_nrcs * 500)
+                # Penalización por distancia TEO-LAB: preferir combos donde TEO y LAB queden cerca
+                gap = self._calc_teo_lab_gap(horario_plano)
+                puntaje = self._calcular_puntaje(horario_plano, preferencias) + (n_nrcs * 500) - (gap / 5)
                 validos_con_puntaje.append((puntaje, horario_plano))
             else:
                 conflictos_diagnostico[msg_conflicto] += 1
@@ -284,6 +288,35 @@ class OptimizadorReal:
             total_score += self._evaluar_dia(dia_ordenado, preferencias)
             
         return int(total_score)
+
+    def _calc_teo_lab_gap(self, horario: List[ClaseConDia]) -> int:
+        """Calcula la suma de gaps en minutos entre TEO y LAB asignados del mismo título.
+        Retorna la suma absoluta de diferencias de puntos medios horarios (en minutos).
+        """
+        por_titulo = {}
+        for c in horario:
+            por_titulo.setdefault(c.titulo, []).append(c)
+
+        total_gap = 0
+        for titulo, clases in por_titulo.items():
+            teo_mid = None
+            lab_mid = None
+            for cl in clases:
+                mid = (cl.minutos_inicio + cl.minutos_fin) // 2
+                tipo_up = (cl.tipo or '').upper()
+                if 'TEOR' in tipo_up or 'TEO' in tipo_up:
+                    teo_mid = mid
+                elif 'LAB' in tipo_up or 'TALLER' in tipo_up or 'PRACT' in tipo_up:
+                    # If multiple labs, take the closest to teo later when teo exists
+                    if lab_mid is None:
+                        lab_mid = mid
+                    else:
+                        # keep the lab with minimal distance to teo if teo exists
+                        if teo_mid is not None and abs(mid - teo_mid) < abs(lab_mid - teo_mid):
+                            lab_mid = mid
+            if teo_mid is not None and lab_mid is not None:
+                total_gap += abs(teo_mid - lab_mid)
+        return total_gap
 
     def _evaluar_dia(self, clases_dia: List[ClaseConDia], prefs: Dict) -> int:
         """Evalúa un día individual: entrada, salida y huecos."""

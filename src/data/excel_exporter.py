@@ -65,13 +65,44 @@ class ExcelExporter:
                 ws.cell(row=row, column=2+d).border = Border(left=Side(style='dotted'), bottom=Side(style='dotted'))
 
         # Bloquear celdas con ramos
+        # Asignar color base por título y tono según tipo (TEO claro, LAB oscuro)
+        def hex_to_rgb(h: str):
+            h = h.lstrip('#')
+            return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+        def rgb_to_hex(rgb):
+            return '%02x%02x%02x' % (max(0, min(255, int(rgb[0]))), max(0, min(255, int(rgb[1]))), max(0, min(255, int(rgb[2]))))
+
+        def adjust_brightness(hexcol: str, factor: float):
+            r, g, b = hex_to_rgb(hexcol)
+            return rgb_to_hex((r * factor, g * factor, b * factor))
+
+        title_base = {}
         nrc_colors = {}
-        idx_color = 0
+        idx = 0
         for c in clases:
-            if c.nrc not in nrc_colors:
-                nrc_colors[c.nrc] = ExcelExporter.COLORES_EXCEL[idx_color % len(ExcelExporter.COLORES_EXCEL)]
-                idx_color += 1
+            if c.titulo not in title_base:
+                base = ExcelExporter.COLORES_EXCEL[idx % len(ExcelExporter.COLORES_EXCEL)]
+                title_base[c.titulo] = base
+                idx += 1
+
+        for c in clases:
+            base = title_base.get(c.titulo, ExcelExporter.COLORES_EXCEL[0])
+            base_hex = base if base.startswith('#') else f"#{base}"
+            tipo_up = (c.tipo or '').upper()
+            tipo_norm = 'TEO' if ('TEOR' in tipo_up or 'TEO' in tipo_up) else 'LAB' if ('LAB' in tipo_up or 'TALLER' in tipo_up or 'PRACT' in tipo_up) else 'OTRO'
             
+            if tipo_norm == 'TEO':
+                tone = adjust_brightness(base_hex, 1.25)
+            elif tipo_norm == 'LAB':
+                tone = adjust_brightness(base_hex, 0.8)
+            else:
+                tone = base_hex.lstrip('#')
+            
+            if c.nrc not in nrc_colors:
+                nrc_colors[c.nrc] = tone
+
+        for c in clases:
             fill = PatternFill(start_color=nrc_colors[c.nrc], end_color=nrc_colors[c.nrc], fill_type="solid")
             try:
                 h_start = int(c.hora_inicio.split(':')[0])
@@ -84,7 +115,9 @@ class ExcelExporter:
                             cell = ws.cell(row=row_map[h], column=col_idx)
                             cell.fill = fill
                             if h == h_start:
-                                cell.value = f"{c.titulo}\n({c.nrc})"
+                                tipo_up = (c.tipo or '').upper()
+                                tipo_norm = 'TEO' if ('TEOR' in tipo_up or 'TEO' in tipo_up) else 'LAB' if ('LAB' in tipo_up or 'TALLER' in tipo_up or 'PRACT' in tipo_up) else 'OTRO'
+                                cell.value = f"{c.titulo} ({tipo_norm})\n({c.nrc})"
                                 cell.alignment = Alignment(wrap_text=True, vertical="center", horizontal="center")
             except: pass
         

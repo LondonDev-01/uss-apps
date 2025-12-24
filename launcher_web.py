@@ -318,10 +318,39 @@ with tab3:
             
             # Mapa de colores para la grilla
             colores_palette = ["#BFDBFE", "#BBF7D0", "#FEF3C7", "#FECACA", "#DDD6FE", "#F5D0FE", "#FED7AA", "#E9D5FF"]
+            
+            def hex_to_rgb(h: str):
+                h = h.lstrip('#')
+                return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+            def rgb_to_hex(rgb):
+                return '#%02x%02x%02x' % (max(0, min(255, int(rgb[0]))), max(0, min(255, int(rgb[1]))), max(0, min(255, int(rgb[2]))))
+
+            def adjust_brightness(hexcol: str, factor: float):
+                r, g, b = hex_to_rgb(hexcol)
+                return rgb_to_hex((r * factor, g * factor, b * factor))
+
+            title_base = {}
             nrc_colors = {}
-            for idx, h in enumerate(horario_actual):
+            
+            # Asignar color base por título
+            for h in horario_actual:
+                if h.titulo not in title_base:
+                    title_base[h.titulo] = colores_palette[len(title_base) % len(colores_palette)]
+
+            # Asignar color por NRC basado en tipo (TEO claro, LAB oscuro)
+            for h in horario_actual:
                 if h.nrc not in nrc_colors:
-                    nrc_colors[h.nrc] = colores_palette[len(nrc_colors) % len(colores_palette)]
+                    base = title_base.get(h.titulo, colores_palette[0])
+                    tipo_up = (h.tipo or '').upper()
+                    tipo_norm = 'TEO' if ('TEOR' in tipo_up or 'TEO' in tipo_up) else 'LAB' if ('LAB' in tipo_up or 'TALLER' in tipo_up or 'PRACT' in tipo_up) else 'OTRO'
+                    
+                    if tipo_norm == 'TEO':
+                        nrc_colors[h.nrc] = adjust_brightness(base, 1.15) # Un poco menos agresivo que desktop para web
+                    elif tipo_norm == 'LAB':
+                        nrc_colors[h.nrc] = adjust_brightness(base, 0.85)
+                    else:
+                        nrc_colors[h.nrc] = base
 
             # Renderizar Grilla HTML
             html_grid = f"""
@@ -376,12 +405,14 @@ with tab3:
             
             for nrc, info in ramos_vistos.items():
                 color = nrc_colors.get(nrc, "#CBD5E1")
+                tipo_up = (info['tipo'] or '').upper()
+                tipo_norm = 'TEO' if ('TEOR' in tipo_up or 'TEO' in tipo_up) else 'LAB' if ('LAB' in tipo_up or 'TALLER' in tipo_up or 'PRACT' in tipo_up) else 'OTRO'
                 st.markdown(f"""
                 <div style="display: flex; align-items: start; margin-bottom: 12px;">
                     <div style="width: 15px; height: 15px; background: {color}; border-radius: 3px; margin-top: 4px; margin-right: 10px; flex-shrink: 0;"></div>
                     <div>
                         <div style="font-size: 0.85rem; font-weight: 600; line-height: 1.2;">{info['titulo']}</div>
-                        <div style="font-size: 0.75rem; color: #64748B;">{info['tipo']} | NRC: {nrc}</div>
+                        <div style="font-size: 0.75rem; color: #64748B;">{tipo_norm} | NRC: {nrc}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
