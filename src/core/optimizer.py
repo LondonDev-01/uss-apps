@@ -111,17 +111,25 @@ class OptimizadorReal:
                             l_conn = l_base.conector.strip() if l_base.conector else ""
                             
                             match_ligas = False
-                            # 1. Si ambos están vacíos, se pueden emparejar libremente
+                            # 1. Si ambos campos de liga/conector están vacíos, emparejar libremente
                             if not t_liga and not t_conn and not l_liga and not l_conn:
                                 match_ligas = True
                             # 2. Si hay códigos, deben coincidir cruzados (T:Liga->L:Conn y L:Liga->T:Conn)
                             elif t_liga == l_conn and l_liga == t_conn:
                                 match_ligas = True
-                            # 3. En cualquier otro caso, se rechaza para evitar ligas rotas
-                            
+
+                            combo = teo_blocks + lab_blocks
+                            # Primero intentar emparejado estricto por ligas/conectores
                             if match_ligas:
-                                # Verificar que el TEO y el LAB no choquen entre sí
-                                combo = teo_blocks + lab_blocks
+                                es_valido_interno, _ = self.verificar_conflictos_detallado(combo)
+                                if es_valido_interno:
+                                    opts_este_ramo.append(combo)
+                            else:
+                                # FALLBACK RELAJADO: Aun si las ligas no coinciden, en la práctica
+                                # muchas ofertas separan TEO/LAB sin usar 'liga/conector' correctamente.
+                                # Por tanto, como requisito del producto, si existe TEO y LAB
+                                # para el mismo título y sus horarios no se pisan entre sí,
+                                # se debe permitir la combinación (tomar 1 NRC de TEO + 1 NRC de LAB).
                                 es_valido_interno, _ = self.verificar_conflictos_detallado(combo)
                                 if es_valido_interno:
                                     opts_este_ramo.append(combo)
