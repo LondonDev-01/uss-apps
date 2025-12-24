@@ -33,13 +33,15 @@ class AuthManager:
                     username TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
                     is_active BOOLEAN DEFAULT FALSE,
-                    expires_at TIMESTAMP
+                    expires_at TIMESTAMP,
+                    telefono TEXT
                 )
             ''')
-            # Migración: Asegurarse de que expires_at existe si la tabla ya fue creada antes
+            # Migración: Asegurarse de que las columnas existen
             cursor.execute('''
                 ALTER TABLE usuarios 
-                ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP
+                ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP,
+                ADD COLUMN IF NOT EXISTS telefono TEXT
             ''')
             conn.commit()
             cursor.close()
@@ -51,7 +53,7 @@ class AuthManager:
         """Genera un hash SHA-256 de la contraseña"""
         return hashlib.sha256(password.encode()).hexdigest()
 
-    def register(self, username: str, password: str) -> Tuple[bool, str]:
+    def register(self, username: str, password: str, telefono: Optional[str] = None) -> Tuple[bool, str]:
         """Registra un nuevo usuario con expiración de 30 días (pero inicia como inactivo)"""
         if not username or not password:
             return False, "Usuario y contraseña son requeridos."
@@ -63,8 +65,8 @@ class AuthManager:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO usuarios (username, password_hash, is_active, expires_at) VALUES (%s, %s, %s, %s)",
-                (username, self._hash_password(password), False, fecha_expiracion)
+                "INSERT INTO usuarios (username, password_hash, is_active, expires_at, telefono) VALUES (%s, %s, %s, %s, %s)",
+                (username, self._hash_password(password), False, fecha_expiracion, telefono)
             )
             conn.commit()
             cursor.close()

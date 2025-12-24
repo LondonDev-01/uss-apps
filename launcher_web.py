@@ -117,10 +117,11 @@ def form_auth():
     with tab_reg:
         with st.form("reg_form"):
             new_u = st.text_input("Elige un Usuario")
+            new_t = st.text_input("WhatsApp (Opcional)")
             new_p = st.text_input("Elige una Contraseña", type="password")
             reg_btn = st.form_submit_button("Registrarse", use_container_width=True)
             if reg_btn:
-                ok, res = st.session_state.auth.register(new_u, new_p)
+                ok, res = st.session_state.auth.register(new_u, new_p, new_t)
                 if ok:
                     st.success(res)
                 else:
