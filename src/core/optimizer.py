@@ -134,12 +134,20 @@ class OptimizadorReal:
                                 if es_valido_interno:
                                     opts_este_ramo.append(combo)
                 
-                # Si no se pudieron emparejar (o solo hay un tipo), agregamos lo que haya de forma individual
+                # Si no se pudieron emparejar:
+                # - Si existen TEO(s), NO añadir opciones sólo LAB: al menos debe aparecer el TEO.
+                #   Por tanto añadimos cada TEO por separado (fallback) para garantizar que
+                #   el generador intente incluir el TEO aunque no haya pairing válido.
+                # - Si no existen TEO, entonces añadimos LAB/OTRO como opciones individuales.
                 if not opts_este_ramo:
-                    for t_key in ["TEO", "LAB", "OTRO"]:
-                        if t_key in tipos:
-                            for blocks in tipos[t_key]:
-                                opts_este_ramo.append(blocks)
+                    if "TEO" in tipos:
+                        for teo_blocks in tipos["TEO"]:
+                            opts_este_ramo.append(teo_blocks)
+                    else:
+                        for t_key in ["LAB", "OTRO"]:
+                            if t_key in tipos:
+                                for blocks in tipos[t_key]:
+                                    opts_este_ramo.append(blocks)
                 
                 if opts_este_ramo:
                     opciones.append(opts_este_ramo)
