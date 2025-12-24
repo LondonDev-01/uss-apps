@@ -2,12 +2,13 @@ import psycopg2
 from psycopg2 import extras
 import hashlib
 import os
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Tuple
 
 class AuthManager:
     """
     Gestor de autenticación y licencias con persistencia en PostgreSQL (Neon.tech).
-    Permite la gestión remota de usuarios para distribución comercial.
+    Incluye lógica de membresía con expiración de 30 días.
     """
     
     def __init__(self, connection_string: str):
@@ -30,7 +31,8 @@ class AuthManager:
                     id SERIAL PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
-                    is_active BOOLEAN DEFAULT FALSE
+                    is_active BOOLEAN DEFAULT FALSE,
+                    expires_at TIMESTAMP
                 )
             ''')
             conn.commit()
@@ -44,33 +46,36 @@ class AuthManager:
         return hashlib.sha256(password.encode()).hexdigest()
 
     def register(self, username: str, password: str) -> Tuple[bool, str]:
-        """Registra un nuevo usuario (inactivo por defecto) en la nube"""
+        """Registra un nuevo usuario con expiración de 30 días (pero inicia como inactivo)"""
         if not username or not password:
             return False, "Usuario y contraseña son requeridos."
+        
+        # Por defecto, la membresía dura 30 días desde el registro
+        fecha_expiracion = datetime.now() + timedelta(days=30)
         
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO usuarios (username, password_hash, is_active) VALUES (%s, %s, %s)",
-                (username, self._hash_password(password), False)
+                "INSERT INTO usuarios (username, password_hash, is_active, expires_at) VALUES (%s, %s, %s, %s)",
+                (username, self._hash_password(password), False, fecha_expiracion)
             )
             conn.commit()
             cursor.close()
             conn.close()
-            return True, "Registro exitoso en la nube. Tu cuenta está pendiente de activación."
+            return True, "Registro exitoso. Tu cuenta está pendiente de activación por el admin."
         except psycopg2.errors.UniqueViolation:
             return False, "El nombre de usuario ya existe."
         except Exception as e:
             return False, f"Error al registrar: {str(e)}"
 
     def login(self, username: str, password: str) -> Tuple[bool, str]:
-        """Valida credenciales remotas y verifica si la cuenta está activa"""
+        """Valida credenciales remotas, estado activo y fecha de expiración"""
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT password_hash, is_active FROM usuarios WHERE username = %s",
+                "SELECT password_hash, is_active, expires_at FROM usuarios WHERE username = %s",
                 (username,)
             )
             result = cursor.fetchone()
@@ -80,12 +85,16 @@ class AuthManager:
             if not result:
                 return False, "Usuario no encontrado."
 
-            db_hash, is_active = result
+            db_hash, is_active, expires_at = result
             if db_hash != self._hash_password(password):
                 return False, "Contraseña incorrecta."
 
             if not is_active:
-                return False, f"Cuenta '{username}' pendiente de activación. Contacta al admin."
+                return False, f"Cuenta '{username}' no activada. Contacta al admin para validar el pago."
+
+            # Verificar expiración (si expires_at es menor a la fecha actual)
+            if expires_at and expires_at < datetime.now():
+                return False, f"Tu membresía expiró el {expires_at.strftime('%d/%m/%Y')}. Contacta al admin para renovar."
 
             self.is_authenticated = True
             self.current_user = username
