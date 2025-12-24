@@ -12,6 +12,9 @@ from src.core.optimizer import OptimizadorReal
 from src.core.models import HorarioCrudo, ClaseConDia
 from src.auth.manager import AuthManager
 
+# Configuración de base de datos remota
+NEON_DB_URL = "postgresql://neondb_owner:REDACTED_CREDENTIAL@ep-twilight-sound-adxqbeo9-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
+
 class HorarioAppCorregida:
     def __init__(self, root):
         self.root = root
@@ -22,7 +25,7 @@ class HorarioAppCorregida:
         # Componentes lógicos
         self.parser = ParserInteligente()
         self.optimizer = OptimizadorReal()
-        self.auth = AuthManager()
+        self.auth = AuthManager(NEON_DB_URL)
         
         # Configuración de estilos y colores
         self.setup_styles()

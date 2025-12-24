@@ -74,9 +74,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Configuración de base de datos remota
+NEON_DB_URL = "postgresql://neondb_owner:REDACTED_CREDENTIAL@ep-twilight-sound-adxqbeo9-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
+
 # Inicializar estados y clases
 if 'auth' not in st.session_state:
-    st.session_state.auth = AuthManager()
+    st.session_state.auth = AuthManager(NEON_DB_URL)
 if 'parser' not in st.session_state:
     st.session_state.parser = ParserInteligente()
 if 'optimizer' not in st.session_state:
