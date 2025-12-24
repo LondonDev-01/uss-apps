@@ -22,10 +22,11 @@ class AuthManager:
         return psycopg2.connect(self.connection_string)
 
     def _init_db(self):
-        """Inicializa la tabla de usuarios en la nube si no existe"""
+        """Inicializa la tabla de usuarios y asegura la migración del esquema"""
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
+            # Crear tabla si no existe
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS usuarios (
                     id SERIAL PRIMARY KEY,
@@ -35,11 +36,16 @@ class AuthManager:
                     expires_at TIMESTAMP
                 )
             ''')
+            # Migración: Asegurarse de que expires_at existe si la tabla ya fue creada antes
+            cursor.execute('''
+                ALTER TABLE usuarios 
+                ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP
+            ''')
             conn.commit()
             cursor.close()
             conn.close()
         except Exception as e:
-            print(f"Error inicializando DB remota: {e}")
+            print(f"Error inicializando/migrando DB remota: {e}")
 
     def _hash_password(self, password: str) -> str:
         """Genera un hash SHA-256 de la contraseña"""
