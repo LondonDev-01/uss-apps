@@ -35,26 +35,26 @@ def increment_version(major, minor):
 
 def build_linux(out_name: str):
     # Requiere pyinstaller instalado
-    cmd = [sys.executable, '-m', 'PyInstaller', '--onefile', '--name', out_name, str(LAUNCHER)]
-    print('Ejecutando:', ' '.join(cmd))
-    subprocess.check_call(cmd)
-
-def clean_and_move(out_name: str):
+    # Limpiar builds previos antes de construir para garantizar que
+    # dist/ contenga solo el ejecutable nuevo.
     if DIST.exists():
         for p in DIST.iterdir():
             try:
                 if p.is_file():
                     p.unlink()
                 else:
-                    # remove dir
                     import shutil
                     shutil.rmtree(p)
             except Exception:
                 pass
-    DIST.mkdir(parents=True, exist_ok=True)
-    # PyInstaller coloca el binario en 'dist/{out_name}'
-    built = Path('dist') / out_name
-    if built.exists():
+    cmd = [sys.executable, '-m', 'PyInstaller', '--clean', '--onefile', '--noconfirm', '--name', out_name, str(LAUNCHER)]
+    print('Ejecutando:', ' '.join(cmd))
+    subprocess.check_call(cmd)
+
+def clean_and_move(out_name: str):
+    # Verificar que el binario existe y dejar dist/ con solo ese archivo
+    built = DIST / out_name
+    if built.exists() or (built.with_suffix('.exe').exists()):
         print(f'Generado: {built}')
     else:
         print('No se encontró el binario esperado en dist/. Revisa PyInstaller output.')

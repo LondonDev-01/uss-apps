@@ -61,6 +61,15 @@ El proyecto sigue una estructura modular para que sea fácil de mantener y escal
 ## 🔄 Notas de Limpieza
 Se removieron archivos de ejemplo y pruebas para dejar el repositorio compacto: `tests/`, imágenes de ayuda y builds intermedios. Se conserva `src/` (código), `README.md`, `MANUAL_TECNICO_MAESTRO.md` y `GUIA_USUARIO.txt`.
 
+## 💾 Dónde se guardan datos del usuario
+- Las sesiones y archivos de estado del usuario ya NO se guardan en el root del repo.
+- En Linux/macOS: `~/.config/unihorario/user_session.json`
+- En Windows: `%APPDATA%\UniHorario\user_session.json`
+
+## 🗂️ Dist y ejecutables
+- El proceso de build coloca un único archivo ejecutable versionado en `dist/` con formato `UniHorarioUSS_v<MAJOR>.<MINOR>`.
+- Si ejecutas `build/build_release.py` localmente, incrementará la versión menor y generará el binario (Linux). Para Windows, el workflow de GitHub Actions puede crear el ejecutable en `dist/`.
+
 ---
 Si quieres, puedo añadir un objetivo Makefile o un `scripts/` con comandos `make run` y `make build` para estandarizar estas instrucciones.
 ## 📦 5. Glosario de Archivos "Raros"

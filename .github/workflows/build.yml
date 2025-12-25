@@ -27,7 +27,6 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    if: false # activable manualmente si se desea (requiere testing)
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
