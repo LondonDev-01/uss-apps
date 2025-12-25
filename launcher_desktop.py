@@ -13,7 +13,21 @@ from src.auth.manager import AuthManager
 
 # Configuración de base de datos remota
 NEON_DB_URL = "postgresql://neondb_owner:REDACTED_CREDENTIAL@ep-twilight-sound-adxqbeo9-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
-SESSION_FILE = "user_session.json"
+
+# Ubicación de archivos de configuración/estado del usuario
+from pathlib import Path
+
+def _get_session_path() -> str:
+    # Linux/macOS: ~/.config/unihorario/user_session.json
+    # Windows: %APPDATA%\\UniHorario\\user_session.json
+    if os.name == 'nt':
+        base = Path(os.getenv('APPDATA', Path.home() / 'AppData' / 'Roaming')) / 'UniHorario'
+    else:
+        base = Path(os.getenv('XDG_CONFIG_HOME', Path.home() / '.config')) / 'unihorario'
+    base.mkdir(parents=True, exist_ok=True)
+    return str(base / 'user_session.json')
+
+SESSION_FILE = _get_session_path()
 
 # Configuración Global
 ctk.set_appearance_mode("Dark")
