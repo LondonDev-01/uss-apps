@@ -3,7 +3,9 @@
 ¡Bienvenido al mejor Optimizador de Horarios para la Universidad San Sebastián! Con esta herramienta, armar tu semestre será pan comido. 🚀
 
 ## 1. Inicio y Acceso
-1.  **Abre el programa:** Ejecuta el archivo `UniHorarioUSS_Cloud.exe`.
+1.  **Abre el programa:**
+    - Recomendada: Ejecuta el lanzador `./build/unihorario` (Linux/macOS) o `python launcher_desktop.py`.
+    - Si tienes un ejecutable compilado, puedes usar `dist/UniHorarioUSS.exe`.
 2.  **Crea tu cuenta:** Si es tu primera vez, ve a la pestaña **"Crea una Cuenta"**, elige un Usuario y Contraseña, y dale a **Registrar**.
 3.  **Activa tu membresía:** 
     *   Al intentar entrar, verás un mensaje de cuenta no activada.
@@ -13,7 +15,11 @@
 ## 2. Cómo Generar tu Horario Perfecto (Paso a Paso)
 
 ### Paso A: Obtener los Datos
-Ve a tu portal de la universidad y busca la sección de oferta académica. **Copia todo el texto** de los ramos que te interesan (donde salen los NRC, horarios, salas, etc.).
+Ve a tu portal de la universidad y copia los ramos que te interesan. El programa acepta tres formatos principales:
+
+- **Lista plana (recomendada):** un array JSON con objetos de sesión (nrc, titulo, tipo, seccion, dia, hora, lugar).
+- **Curso con secciones:** `{ "curso": "NOMBRE", "secciones": [ ... ] }` (puedes enviar una lista de estos objetos).
+- **Texto copiado del portal o guía PDF (Auto/Tabular/Visual):** Pega el bloque en la caja correspondiente y selecciona el modo si es necesario.
 
 ### Paso B: Ingresar Ramos
 1.  Pega el texto copiado en los cuadros correspondientes según la categoría:
