@@ -7,7 +7,6 @@ ENV/
 env/
 .env
 dist/
-build/
 *.spec
 *.xlsx
 *.json
