@@ -41,6 +41,28 @@ El proyecto sigue una estructura modular para que sea fácil de mantener y escal
 5. **OpenPyXL:** Para crear los archivos Excel desde cero.
 6. **PyInstaller:** El "empaquetador" que convierte el código Python en un archivo `.exe` que corre en cualquier PC sin necesidad de instalar nada.
 
+## ▶️ Quick Start (Desarrollador y Usuario)
+
+1. Requisitos mínimos:
+   - Python 3.10+ instalado
+   - Instalar dependencias: `pip install -r requirements.txt`
+
+2. Ejecutar la aplicación (forma recomendada):
+   - Usar el lanzador incluido:
+     - Linux/macOS: `./build/unihorario`
+     - Windows (si se creó un .exe): `dist/UniHorarioUSS.exe` (si aplica)
+   - Alternativa: `python launcher_desktop.py`
+
+3. Generar ejecutable (opcional):
+   - Si quieres un `.exe` o binario, usa PyInstaller con la spec adecuada (ejemplo):
+     `pyinstaller UniHorarioUSS_Oficial.spec --noconfirm`
+   - Después de crear el ejecutable, **las `.spec` ya no son estrictamente necesarias** y se pueden eliminar del repositorio si prefieres mantenerlo limpio.
+
+## 🔄 Notas de Limpieza
+Se removieron archivos de ejemplo y pruebas para dejar el repositorio compacto: `tests/`, imágenes de ayuda y builds intermedios. Se conserva `src/` (código), `README.md`, `MANUAL_TECNICO_MAESTRO.md` y `GUIA_USUARIO.txt`.
+
+---
+Si quieres, puedo añadir un objetivo Makefile o un `scripts/` con comandos `make run` y `make build` para estandarizar estas instrucciones.
 ## 📦 5. Glosario de Archivos "Raros"
 - **`.spec`**: Archivos de configuración de PyInstaller. Dicen qué carpetas e imágenes meter dentro del `.exe`. Se pueden borrar después de crear el ejecutable.
 - **`__pycache__`**: Carpetas que crea Python para que el código corra más rápido. Son basura, se pueden borrar.
