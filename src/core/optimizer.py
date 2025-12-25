@@ -75,20 +75,21 @@ class OptimizadorReal:
                 prioridad_por_titulo[titulo] = current_p
 
         # 1. Agrupar bloques por NRC y filtrar por la prioridad ganadora del título
+        # Usamos (titulo, nrc) como clave para evitar colisiones si diferentes ramos usan el mismo NRC (ej: "T01")
         nrc_blocks = defaultdict(list)
         for c in candidatos:
             if c.prioridad == prioridad_por_titulo[c.titulo]:
-                nrc_blocks[c.nrc].append(c)
+                nrc_blocks[(c.titulo, c.nrc)].append(c)
             
         ramos_por_prioridad = {0: defaultdict(lambda: defaultdict(list)), 
                                1: defaultdict(lambda: defaultdict(list)), 
                                2: defaultdict(lambda: defaultdict(list))}
 
-        for nrc, blocks in nrc_blocks.items():
+        for (titulo, nrc), blocks in nrc_blocks.items():
             base = blocks[0]
             tipo_up = (base.tipo or '').upper()
             tipo_norm = "TEO" if ("TEOR" in tipo_up or "TEO" in tipo_up) else "LAB" if ("LAB" in tipo_up or "TALLER" in tipo_up or "PRACT" in tipo_up) else "OTRO"
-            ramos_por_prioridad[base.prioridad][base.titulo][tipo_norm].append(blocks)
+            ramos_por_prioridad[base.prioridad][titulo][tipo_norm].append(blocks)
 
         # 2. Construir UNA lista de opciones por RAMO (que pueden ser TEO+LAB)
         def consolidar_opciones(agrupacion):
@@ -286,6 +287,16 @@ class OptimizadorReal:
 
             dia_ordenado = sorted(clases, key=lambda x: x.minutos_inicio)
             total_score += self._evaluar_dia(dia_ordenado, preferencias)
+        
+        # Bono por Consistencia de Sección (Instrucción USS: preferir todos T01, T02 o T03)
+        secciones_teo = [c.seccion for c in horario if (c.tipo or '').upper() == 'TEO']
+        if secciones_teo:
+            # Contar cuál es la sección teórica más frecuente en este horario
+            conteo = {}
+            for s in secciones_teo: conteo[s] = conteo.get(s, 0) + 1
+            max_frecuencia = max(conteo.values())
+            # Dar un bono proporcional a cuántos ramos comparten la misma sección teórica
+            total_score += (max_frecuencia * 150)
             
         return int(total_score)
 

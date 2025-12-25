@@ -155,10 +155,17 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.markdown("### ⚙️ Preferencias de Horario")
     col_p1, col_p2, col_p3, col_p4 = st.columns(4)
-    with col_p1: pref_no_temprano = st.checkbox("Priorizar entrar más tarde", value=True)
-    with col_p2: pref_no_tarde = st.checkbox("Priorizar salir más temprano", value=True)
-    with col_p3: pref_sin_ventanas = st.checkbox("Reducir ventanas", value=True)
+    with col_p1: pref_no_temprano = st.checkbox("Priorizar NO Entrar Temprano", value=True)
+    with col_p2: pref_no_tarde = st.checkbox("Priorizar NO Salir Tarde", value=True)
+    with col_p3: pref_sin_ventanas = st.checkbox("Menos Ventanas", value=True)
     with col_p4: pref_sin_sabados = st.checkbox("Evitar clases los Sábados", value=True)
+
+    st.markdown("---")
+    st.markdown("### 📥 Método de Ingreso")
+    
+    modo_ingreso = st.radio("Selecciona el formato del texto que vas a pegar:", 
+                            ["Auto", "Tabular (Portal/Excel)", "Visual (Guía PDF)", "JSON"], 
+                            horizontal=True, help="Auto detecta el formato, pero puedes forzar uno si falla.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -183,9 +190,13 @@ with tab1:
     with col_btn2:
         if st.button("Procesar Todo e ir a Paso 2 ➜", type="primary", use_container_width=True):
             all_crudos = []
-            if t0.strip(): all_crudos.extend(st.session_state.parser.parsear_texto_por_prioridad(t0, 0))
-            if t1.strip(): all_crudos.extend(st.session_state.parser.parsear_texto_por_prioridad(t1, 1))
-            if t2.strip(): all_crudos.extend(st.session_state.parser.parsear_texto_por_prioridad(t2, 2))
+            # Mapeo de nombres de UI a parámetros de código
+            map_modos = {"Auto": "Auto", "Tabular (Portal/Excel)": "Tabular", "Visual (Guía PDF)": "Visual", "JSON": "JSON"}
+            m = map_modos[modo_ingreso]
+            
+            if t0.strip(): all_crudos.extend(st.session_state.parser.parsear_texto_por_prioridad(t0, 0, modo=m))
+            if t1.strip(): all_crudos.extend(st.session_state.parser.parsear_texto_por_prioridad(t1, 1, modo=m))
+            if t2.strip(): all_crudos.extend(st.session_state.parser.parsear_texto_por_prioridad(t2, 2, modo=m))
             
             if all_crudos:
                 st.session_state.horarios_crudos = all_crudos
@@ -194,10 +205,17 @@ with tab1:
                 # Sincronizar Almacén JSON
                 ramos_por_titulo = defaultdict(list)
                 for h in all_crudos:
-                    d = {"nrc": h.nrc, "tipo": h.tipo, "seccion": h.seccion, "hora": h.hora_str, "lugar": h.ubicacion}
+                    d = {
+                        "nrc": h.nrc, 
+                        "tipo": h.tipo, 
+                        "seccion": h.seccion, 
+                        "dia": h.dia_parseado,
+                        "hora": h.hora_str, 
+                        "lugar": h.ubicacion
+                    }
                     ramos_por_titulo[h.titulo].append(d)
                 for titulo, secciones in ramos_por_titulo.items():
-                    st.session_state.json_store[titulo] = {"titulo": titulo, "secciones": secciones}
+                    st.session_state.json_store[titulo] = {"curso": titulo, "secciones": secciones}
                 
                 # Auto-detección para Paso 2
                 agrupados = st.session_state.parser.agrupar_por_nrc(all_crudos)
@@ -301,12 +319,20 @@ with tab3:
         
         horario_actual = st.session_state.mejores_horarios[st.session_state.indice_horario]
         
-        col_nav1, col_nav2 = st.columns([2, 1])
+        col_nav1, col_nav2, col_nav3 = st.columns([2, 1, 1])
         with col_nav1:
             st.markdown(f"**Viendo opción {st.session_state.indice_horario + 1} de {len(st.session_state.mejores_horarios)}**")
         with col_nav2:
             if st.button("🔄 Ver otra opción", use_container_width=True):
                 st.session_state.indice_horario = (st.session_state.indice_horario + 1) % len(st.session_state.mejores_horarios)
+                st.rerun()
+        with col_nav3:
+            if st.button("🗑️ REINICIAR TODO", type="secondary", use_container_width=True):
+                st.session_state.horarios_crudos = []
+                st.session_state.selecciones = {}
+                st.session_state.mejores_horarios = []
+                st.session_state.json_store = {}
+                st.session_state.indice_horario = 0
                 st.rerun()
 
         col_main, col_sidebar = st.columns([3.5, 1])
@@ -431,15 +457,41 @@ with tab4:
         st.info("Genera un horario primero.")
     else:
         st.markdown("### Paso 4: Exportar Resultado")
-        st.write("Presiona el botón para generar y descargar tu horario en formato Excel (compatible con Google Sheets y Office).")
         
-        filename = f"Horario_Opcion_{st.session_state.indice_horario + 1}.xlsx"
-        if st.button("Generar Archivo Excel", type="primary", use_container_width=True):
-            with st.spinner("Generando archivo..."):
-                from src.data.excel_exporter import ExcelExporter
-                ExcelExporter.exportar(st.session_state.mejores_horarios[st.session_state.indice_horario], filename)
-                with open(filename, "rb") as f:
-                    st.download_button("⬇️ DESCARGAR EXCEL AHORA", f, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        col_exp1, col_exp2 = st.columns(2)
+        
+        with col_exp1:
+            st.markdown("#### 📊 Formato Excel")
+            st.write("Ideal para imprimir o compartir.")
+            filename = f"Horario_Opcion_{st.session_state.indice_horario + 1}.xlsx"
+            if st.button("Generar Archivo Excel", type="primary", use_container_width=True):
+                with st.spinner("Generando archivo..."):
+                    from src.data.excel_exporter import ExcelExporter
+                    ExcelExporter.exportar(st.session_state.mejores_horarios[st.session_state.indice_horario], filename)
+                    with open(filename, "rb") as f:
+                        st.download_button("⬇️ DESCARGAR EXCEL AHORA", f, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        
+        with col_exp2:
+            st.markdown("#### 📄 Formato JSON")
+            st.write("Copia este JSON para respaldar o importar tu horario.")
+            
+            # Construir JSON del horario actual
+            horario_actual = st.session_state.mejores_horarios[st.session_state.indice_horario]
+            data_export = []
+            for c in horario_actual:
+                data_export.append({
+                    "nrc": c.nrc,
+                    "titulo": c.titulo,
+                    "tipo": c.tipo,
+                    "seccion": c.seccion,
+                    "dia": c.dia,
+                    "hora": f"{c.hora_inicio} - {c.hora_fin}",
+                    "lugar": f"{c.edificio} {c.salon}"
+                })
+            
+            json_str = json.dumps(data_export, indent=4, ensure_ascii=False)
+            st.code(json_str, language="json")
+            st.download_button("⬇️ Descargar como archivo .json", json_str, file_name=f"Horario_Opcion_{st.session_state.indice_horario + 1}.json", mime="application/json", use_container_width=True)
 
 # --- TAB 5: GESTIÓN JSON ---
 with tab5:
@@ -450,7 +502,9 @@ with tab5:
     else:
         for titulo, data in st.session_state.json_store.items():
             with st.expander(f"📦 Asignatura: {titulo}"):
-                st.json(data)
+                json_text = json.dumps(data, indent=4, ensure_ascii=False)
+                st.code(json_text, language="json")
+                st.button(f"📋 Copiar JSON de {titulo}", on_click=lambda t=json_text: st.write(f"Copiado al portapapeles (Simulado): {t[:20]}..."), key=f"copy_{titulo}")
         
-        full_json = json.dumps(st.session_state.json_store, indent=4, ensure_ascii=False)
+        full_json = json.dumps(list(st.session_state.json_store.values()), indent=4, ensure_ascii=False)
         st.download_button("💾 Exportar Base de Datos Completa (JSON)", full_json, file_name="almacen_ramos_completo.json", mime="application/json")
