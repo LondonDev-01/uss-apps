@@ -5,18 +5,18 @@ import json
 import os
 from datetime import datetime
 from collections import defaultdict
+import uuid
+import platform
+import hashlib
 
 from src.data.parser import ParserInteligente
 from src.core.optimizer import OptimizadorReal
-from src.core.models import HorarioCrudo, ClaseConDia
-from src.auth.manager import AuthManager
-
-# Configuración de base de datos remota
 NEON_DB_URL = "postgresql://neondb_owner:REDACTED_CREDENTIAL@ep-twilight-sound-adxqbeo9-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
 SESSION_FILE = "user_session.json"
+DEVICE_FILE = ".device_id"
+from src.auth.manager import AuthManager
 
 # Configuración Global
-ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
 class HorarioAppProfesional:
@@ -38,18 +38,45 @@ class HorarioAppProfesional:
         self.root.withdraw()
         self.abrir_login()
         
-        # Intentar Carga de Sesión Automática
+        # Generar/recuperar device id y luego intentar autologin
+        self.device_id = self._get_or_create_device_id()
         self.root.after(500, self.intentar_autologin)
+
+        # Asegurar cierre limpio (revocar sesión activa en servidor)
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         
         # Estado de la aplicación
         self.horarios_crudos = []
         self.selecciones_usuario = {}
+        
         self.nrc_widgets = {}
         self.mejores_horarios = []
         self.indice_horario_actual = 0
-        self.ramos_json_store = {}
+        
         self.mapa_colores_actual = {}
         
+    def _get_or_create_device_id(self) -> str:
+        try:
+            if os.path.exists(DEVICE_FILE):
+                with open(DEVICE_FILE, 'r', encoding='utf-8') as f:
+                    return f.read().strip()
+            raw = f"{uuid.getnode()}-{platform.node()}-{platform.platform()}"
+            did = hashlib.sha256(raw.encode()).hexdigest()
+            with open(DEVICE_FILE, 'w', encoding='utf-8') as f:
+                f.write(did)
+            return did
+        except Exception:
+            # Fallback simple id
+            return hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()
+
+    def on_close(self):
+        # Revocar sesión activa en servidor si corresponde
+        try:
+            if hasattr(self, 'auth') and self.auth and self.auth.current_user:
+                self.auth.logout(self.auth.current_user, self.device_id)
+        except Exception:
+            pass
+        self.root.destroy()
         # Preferencias
         self.pref_no_temprano = tk.BooleanVar(value=True)
         self.pref_no_tarde = tk.BooleanVar(value=True)
@@ -70,6 +97,11 @@ class HorarioAppProfesional:
         
         self.lbl_user_info = ctk.CTkLabel(self.header_frame, text="Invitado", font=ctk.CTkFont(size=12))
         self.lbl_user_info.pack(side="right", padx=20)
+        # Botón de gestión de licencia / sesión
+        self.btn_license = ctk.CTkButton(self.header_frame, text="Licencia", width=100, height=28, fg_color="#111827", command=self.open_license_manager)
+        self.btn_license.pack(side="right", padx=(0,10))
+        self.btn_logout = ctk.CTkButton(self.header_frame, text="Cerrar sesión", width=120, height=28, fg_color="#ef4444", command=self.do_logout)
+        self.btn_logout.pack(side="right", padx=(0,10))
         
         # Tabview Principal
         self.tabview = ctk.CTkTabview(self.root)
@@ -115,18 +147,97 @@ class HorarioAppProfesional:
                     data = json.load(f)
                     u, p = data.get('u'), data.get('p')
                     if u and p:
-                        ok, msg = self.auth.login(u, p)
+                        ok, msg = self.auth.login(u, p, self.device_id)
                         if ok:
                             self.lbl_user_info.configure(text=f"Sesión: {u}")
                             self.root.deiconify()
                             if hasattr(self, 'login_win_ref'): self.login_win_ref.destroy()
+                        else:
+                            # Si la cuenta está activa en otro dispositivo, preguntar si quiere transferir
+                            if "otro dispositivo" in msg.lower():
+                                if messagebox.askyesno("Transferir licencia", "Esta cuenta está activa en otro dispositivo. ¿Deseas transferir la licencia a este equipo?"):
+                                    ok2, msg2 = self.auth.login(u, p, self.device_id, transfer=True)
+                                    if ok2:
+                                        self.lbl_user_info.configure(text=f"Sesión: {u}")
+                                        self.root.deiconify()
+                                        if hasattr(self, 'login_win_ref'): self.login_win_ref.destroy()
+                                    else:
+                                        print("No se pudo transferir la licencia:", msg2)
+                    else:
+                        # No logged in; ensure UI shows invitado
+                        self.lbl_user_info.configure(text="Invitado")
             except: pass
 
     def guardar_sesion(self, u, p):
         try:
             with open(SESSION_FILE, 'w', encoding='utf-8') as f:
-                json.dump({'u': u, 'p': p, 't': str(datetime.now())}, f)
+                json.dump({'u': u, 'p': p, 't': str(datetime.now()), 'device_id': self.device_id}, f)
         except: pass
+
+    def open_license_manager(self):
+        if not self.auth or not self.auth.current_user:
+            messagebox.showinfo("Licencia", "No has iniciado sesión.")
+            return
+        cur = self.auth.current_user
+        active = self.auth.get_active_device(cur)
+        win = ctk.CTkToplevel(self.root)
+        win.title("Gestión de licencia")
+        win.geometry("420x220")
+        win.resizable(False, False)
+
+        ctk.CTkLabel(win, text=f"Usuario: {cur}", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(12,6))
+        ctk.CTkLabel(win, text=f"Dispositivo activo: {active if active else 'ninguno'}", font=ctk.CTkFont(size=12)).pack(pady=(0,10))
+
+        def do_release():
+            if not active:
+                messagebox.showinfo("Licencia", "No hay sesión remota para liberar.")
+                return
+            if active == self.device_id:
+                messagebox.showinfo("Licencia", "La sesión activa corresponde a este equipo.")
+                return
+            if messagebox.askyesno("Confirmar", "Liberar la sesión remota? Esto permitirá iniciar en este equipo."):
+                try:
+                    self.auth.logout(cur, active)
+                    messagebox.showinfo("Éxito", "Sesión remota liberada.")
+                    win.destroy()
+                except Exception as e:
+                    messagebox.showerror("Error", str(e))
+
+        def do_force_transfer():
+            # Pedir contraseña y forzar transferencia
+            pwd = ctk.CTkInputDialog(text="Ingresa tu contraseña para transferir:", title="Confirmar transferencia").get_input()
+            if not pwd:
+                return
+            ok, msg = self.auth.login(cur, pwd, self.device_id, transfer=True)
+            if ok:
+                messagebox.showinfo("Éxito", "Licencia transferida a este equipo.")
+                self.lbl_user_info.configure(text=f"Sesión: {cur}")
+                self.guardar_sesion(cur, pwd)
+                win.destroy()
+            else:
+                messagebox.showerror("Error", msg)
+
+        btn_rel = ctk.CTkButton(win, text="Liberar sesión remota", fg_color="#f97316", command=do_release)
+        btn_rel.pack(pady=(6,4), padx=30, fill="x")
+        btn_force = ctk.CTkButton(win, text="Transferir a este equipo (clave)", fg_color="#10b981", command=do_force_transfer)
+        btn_force.pack(pady=(4,10), padx=30, fill="x")
+
+    def do_logout(self):
+        # Cerrar sesión localmente y en servidor
+        if not self.auth or not self.auth.current_user:
+            messagebox.showinfo("Salir", "No hay sesión activa.")
+            return
+        user = self.auth.current_user
+        try:
+            self.auth.logout(user, self.device_id)
+        except Exception:
+            pass
+        try:
+            if os.path.exists(SESSION_FILE): os.remove(SESSION_FILE)
+        except Exception:
+            pass
+        self.lbl_user_info.configure(text="Invitado")
+        messagebox.showinfo("Salir", "Sesión cerrada.")
 
     def abrir_login(self):
         self.login_win_ref = ctk.CTkToplevel(self.root)
@@ -159,7 +270,7 @@ class HorarioAppProfesional:
         def do_login(event=None):
             u, p = u_e.get(), p_e.get()
             if not u or not p: return
-            ok, msg = self.auth.login(u, p)
+            ok, msg = self.auth.login(u, p, self.device_id)
             if ok:
                 self.guardar_sesion(u, p)
                 self.login_win_ref.destroy()
@@ -167,6 +278,19 @@ class HorarioAppProfesional:
                 self.root.attributes("-zoomed", True)
                 self.lbl_user_info.configure(text=f"Sesión: {u}")
             else: messagebox.showerror("Error", msg)
+
+            # Si la cuenta está activa en otro dispositivo, ofrecer transferencia
+            if not ok and "otro dispositivo" in msg.lower():
+                if messagebox.askyesno("Transferir licencia", "La cuenta está activa en otro dispositivo. ¿Transferir la licencia a este equipo? Esta acción cerrará la sesión remota."):
+                    ok2, msg2 = self.auth.login(u, p, self.device_id, transfer=True)
+                    if ok2:
+                        self.guardar_sesion(u, p)
+                        self.login_win_ref.destroy()
+                        self.root.deiconify()
+                        self.root.attributes("-zoomed", True)
+                        self.lbl_user_info.configure(text=f"Sesión: {u}")
+                    else:
+                        messagebox.showerror("Error", msg2)
 
         btn = ctk.CTkButton(card, text="INICIAR SESIÓN", command=do_login, height=48, corner_radius=10, font=("Inter", 14, "bold"))
         btn.pack(fill="x", padx=40, pady=(15, 10))
