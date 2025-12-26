@@ -15,3 +15,6 @@ build/
 .idea/
 .vscode/
 *.log
+
+# Local device id used by dev environment
+.device_id
