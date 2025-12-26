@@ -34,7 +34,8 @@ class AuthManager:
                     password_hash TEXT NOT NULL,
                     is_active BOOLEAN DEFAULT FALSE,
                     expires_at TIMESTAMP,
-                    telefono TEXT
+                    telefono TEXT,
+                    migrate_pass_hash TEXT
                 )
             ''')
             # Migración: Asegurarse de que las columnas existen
@@ -42,6 +43,7 @@ class AuthManager:
                 ALTER TABLE usuarios 
                 ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP,
                 ADD COLUMN IF NOT EXISTS telefono TEXT
+                , ADD COLUMN IF NOT EXISTS migrate_pass_hash TEXT
             ''')
             # Tabla para sesiones activas (una por usuario)
             cursor.execute('''
@@ -68,6 +70,30 @@ class AuthManager:
     def _hash_password(self, password: str) -> str:
         """Genera un hash SHA-256 de la contraseña"""
         return hashlib.sha256(password.encode()).hexdigest()
+
+    def set_migrate_password(self, username: str, password: str) -> Tuple[bool, str]:
+        """Configura una contraseña de migración (almacenada como hash) para un usuario."""
+        if not username or not password:
+            return False, "Usuario y contraseña requeridos"
+        try:
+            conn = self._get_connection(); cur = conn.cursor()
+            cur.execute("UPDATE usuarios SET migrate_pass_hash = %s WHERE username = %s", (self._hash_password(password), username))
+            conn.commit(); cur.close(); conn.close()
+            return True, "Contraseña de migración establecida"
+        except Exception as e:
+            return False, f"Error: {e}"
+
+    def validate_migrate_password(self, username: str, password: str) -> bool:
+        """Valida la contraseña de migración para el usuario."""
+        try:
+            conn = self._get_connection(); cur = conn.cursor()
+            cur.execute("SELECT migrate_pass_hash FROM usuarios WHERE username = %s", (username,))
+            row = cur.fetchone(); cur.close(); conn.close()
+            if not row or not row[0]:
+                return False
+            return row[0] == self._hash_password(password)
+        except Exception:
+            return False
 
     # --- Migration keys management ---
     def generate_migration_key(self, username: Optional[str] = None, days_valid: int = 5) -> str:
@@ -221,9 +247,39 @@ class AuthManager:
         self.is_authenticated = False
         self.current_user = None
 
-    def has_active_license(self) -> bool:
-        """Verificación rápida de seguridad"""
-        return self.is_authenticated
+    def has_active_license(self, device_id: Optional[str] = None) -> bool:
+        """Verificación rápida de seguridad.
+
+        Si se pasa `device_id`, retorna True solo si la licencia está activa y la sesión
+        activa corresponde a ese `device_id`.
+        Si no se pasa, retorna True si la cuenta está activa y existe alguna sesión activa.
+        """
+        try:
+            if not self.current_user:
+                return False
+            conn = self._get_connection(); cur = conn.cursor()
+            cur.execute("SELECT is_active FROM usuarios WHERE username = %s", (self.current_user,))
+            row = cur.fetchone()
+            if not row:
+                cur.close(); conn.close(); return False
+            is_active = row[0]
+            if not is_active:
+                cur.close(); conn.close(); return False
+
+            # Si nos piden comprobar un device concreto, delegar a is_license_active_on_device
+            if device_id:
+                cur.close(); conn.close()
+                return self.is_license_active_on_device(self.current_user, device_id)
+
+            # Sin device_id: basta con que exista una sesión activa para el usuario
+            cur.execute("SELECT device_id FROM active_sessions WHERE username = %s", (self.current_user,))
+            row2 = cur.fetchone(); cur.close(); conn.close()
+            if not row2:
+                return False
+            return True
+        except Exception:
+            # Fallback a estado local
+            return self.is_authenticated
 
     def is_license_active_on_device(self, username: str, device_id: str) -> bool:
         """Retorna True si la cuenta existe, está activa y la sesión activa coincide con device_id."""

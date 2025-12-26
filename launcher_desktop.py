@@ -58,6 +58,8 @@ class HorarioAppProfesional:
         self.abrir_login()
         # Intentar autologin después de un breve delay
         self.root.after(500, self.intentar_autologin)
+        # Chequeo periódico de licencia para detectar revocaciones remotas
+        self._periodic_license_check()
 
         # Asegurar cierre limpio (revocar sesión activa en servidor)
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -185,7 +187,7 @@ class HorarioAppProfesional:
                             ok, msg = self.auth.login(u, p, self.device_id)
                             if ok:
                                 # Mostrar estado de licencia en la etiqueta
-                                if self.auth.has_active_license():
+                                if self.auth.has_active_license(self.device_id):
                                     self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia activa)")
                                 else:
                                     self.lbl_user_info.configure(text=f"Sesión: {u} (Sin licencia)")
@@ -272,14 +274,23 @@ class HorarioAppProfesional:
                 return
             valid = False
             try:
+                # Primero intentar con clave temporal
                 valid = self.auth.validate_migration_key(clave.strip(), cur)
+                # Si no es válida, intentar con la contraseña de migración del usuario
+                if not valid:
+                    valid = self.auth.validate_migrate_password(cur, clave.strip())
+                    if valid:
+                        # password-based migration: allow but do not delete server key
+                        pass
             except Exception:
                 valid = False
             if valid:
                 ok, msg = self.auth.migrate_license(cur, self.device_id)
                 if ok:
                     # borrar clave usada
-                    try: self.auth.delete_migration_key(clave.strip())
+                    try:
+                        # Si la clave era una migration_key, elimínala; si fue password-based, no la borramos
+                        self.auth.delete_migration_key(clave.strip())
                     except: pass
                     messagebox.showinfo("Éxito", "Licencia migrada correctamente a este equipo.")
                     self.lbl_user_info.configure(text=f"Sesión: {cur} (Licencia migrada)")
@@ -371,7 +382,7 @@ class HorarioAppProfesional:
                 # Actualizar etiqueta de usuario si existe (y mostrar estado de licencia)
                 if hasattr(self, 'lbl_user_info'):
                     try:
-                        if self.auth.has_active_license():
+                        if self.auth.has_active_license(self.device_id):
                             self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia activa)")
                         else:
                             self.lbl_user_info.configure(text=f"Sesión: {u} (Sin licencia)")
@@ -489,7 +500,7 @@ class HorarioAppProfesional:
                 try:
                     active = self.auth.is_license_active_on_device(self.auth.current_user, self.device_id)
                 except Exception:
-                    active = self.auth.has_active_license()
+                    active = self.auth.has_active_license(self.device_id)
             else:
                 active = False
             if active:
@@ -518,6 +529,33 @@ class HorarioAppProfesional:
         except Exception:
             pass
 
+    def _periodic_license_check(self, interval_ms: int = 15000):
+        """Revisa periódicamente si la licencia sigue activa en este dispositivo y actualiza la UI."""
+        try:
+            if self.auth and self.auth.current_user:
+                active_on_device = False
+                try:
+                    active_on_device = self.auth.is_license_active_on_device(self.auth.current_user, self.device_id)
+                except Exception:
+                    active_on_device = self.auth.has_active_license(self.device_id)
+                # Si ya no es activa, reflejarlo en UI
+                if not active_on_device:
+                    try:
+                        self.lbl_user_info.configure(text=f"Sesión: {self.auth.current_user} (Sin licencia)")
+                    except Exception:
+                        pass
+                    try:
+                        self._update_license_ui()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        finally:
+            try:
+                self.root.after(interval_ms, lambda: self._periodic_license_check(interval_ms))
+            except Exception:
+                pass
+
 
     def limpiar_inputs(self):
         self.t0.delete("1.0", tk.END); self.t1.delete("1.0", tk.END); self.t2.delete("1.0", tk.END)
@@ -544,7 +582,7 @@ class HorarioAppProfesional:
 
     def procesar_todo(self):
         # Requerir licencia activa antes de procesar
-        if not self.auth.has_active_license():
+        if not self.auth.has_active_license(self.device_id):
             messagebox.showwarning("Licencia requerida", f"No puedes procesar sin una licencia activa. Migra tu licencia contactando al desarrollador ({LICENSE_MIGRATION_CONTACT}) y proporciona esta llave: {LICENSE_MIGRATION_HASH}")
             return
         self.horarios_crudos = []
