@@ -50,6 +50,16 @@ class HorarioAppProfesional:
         self.optimizer = OptimizadorReal()
         self.auth = AuthManager(NEON_DB_URL)
         
+    # Preferencias
+    self.pref_no_temprano = tk.BooleanVar(value=True)
+    self.pref_no_tarde = tk.BooleanVar(value=True)
+    self.pref_sin_ventanas = tk.BooleanVar(value=True)
+    self.pref_sin_sabados = tk.BooleanVar(value=True)
+    self.modo_parser = tk.StringVar(value="Auto")
+
+    # Setup UI (se oculta hasta login)
+    self.setup_ui()
+        
         # Ocultar ventana principal hasta login
         self.root.withdraw()
         # Generar/recuperar device id antes de abrir UI de login (evita condiciones de carrera)
@@ -93,15 +103,6 @@ class HorarioAppProfesional:
         except Exception:
             pass
         self.root.destroy()
-        # Preferencias
-        self.pref_no_temprano = tk.BooleanVar(value=True)
-        self.pref_no_tarde = tk.BooleanVar(value=True)
-        self.pref_sin_ventanas = tk.BooleanVar(value=True)
-        self.pref_sin_sabados = tk.BooleanVar(value=True)
-        self.modo_parser = tk.StringVar(value="Auto")
-        
-        # Setup UI
-        self.setup_ui()
         
     def setup_ui(self):
         # Header
