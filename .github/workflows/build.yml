@@ -20,7 +20,13 @@ jobs:
       - name: Install requirements
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
+          pip install -r requirements.txt
+          python -m pip install --upgrade setuptools wheel
+      - name: Show Python & pip info
+        run: |
+          python -V
+          pip -V
+          pip list --format=columns
       - name: Run build script
         run: |
           python build/build_release.py
@@ -46,7 +52,14 @@ jobs:
           pip install pyinstaller
       - name: Run build script (Windows)
         run: |
-          python build/build_release.py
+          set -o pipefail
+          python build/build_release.py 2>&1 | tee build_windows_output.txt
+      - name: Upload build logs (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-logs
+          path: build_windows_output.txt
       - name: Read version
         id: get_version
         run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
