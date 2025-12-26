@@ -452,11 +452,36 @@ class HorarioAppProfesional:
         ctk.CTkLabel(pf, text="Método de Ingreso:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(30, 5))
         self.menu_modo = ctk.CTkOptionMenu(pf, values=["Auto", "Tabular", "Visual", "JSON"], variable=self.modo_parser, width=120)
         self.menu_modo.pack(side="left", padx=5)
+        
+        # Campos de texto para pegar datos
+        self.t0 = ctk.CTkTextbox(tab, font=("Consolas", 13), border_width=1)
+        self.t0.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
+        self.t1 = ctk.CTkTextbox(tab, font=("Consolas", 13), border_width=1)
+        self.t1.grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
+        self.t2 = ctk.CTkTextbox(tab, font=("Consolas", 13), border_width=1)
+        self.t2.grid(row=2, column=2, sticky="nsew", padx=5, pady=5)
+
+        ft = ctk.CTkFrame(tab, fg_color="transparent")
+        ft.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(15, 0))
+        
+        # Solo botón de procesamiento local
+        ctk.CTkButton(ft, text="PROCESAR TODO", width=200, height=50, command=self.procesar_todo, 
+                  font=ctk.CTkFont(size=14, weight="bold")).pack(side="right", padx=10)
+        ctk.CTkButton(ft, text="Limpiar Texto", fg_color="#64748B", hover_color="#475569", 
+                  command=self.limpiar_inputs, width=120).pack(side="left", padx=5)
 
     def _update_license_ui(self):
         """Actualizar elementos visuales relacionados con la licencia (ocultar/mostrar botones y estado)."""
         try:
-            active = self.auth.has_active_license()
+            # Determinar si la licencia está activa y asignada a este dispositivo
+            active = False
+            if self.auth and self.auth.current_user:
+                try:
+                    active = self.auth.is_license_active_on_device(self.auth.current_user, self.device_id)
+                except Exception:
+                    active = self.auth.has_active_license()
+            else:
+                active = False
             if active:
                 # Ocultar botón de licencia si está activa
                 try:
@@ -483,21 +508,6 @@ class HorarioAppProfesional:
         except Exception:
             pass
 
-        self.t0 = ctk.CTkTextbox(tab, font=("Consolas", 13), border_width=1)
-        self.t0.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
-        self.t1 = ctk.CTkTextbox(tab, font=("Consolas", 13), border_width=1)
-        self.t1.grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
-        self.t2 = ctk.CTkTextbox(tab, font=("Consolas", 13), border_width=1)
-        self.t2.grid(row=2, column=2, sticky="nsew", padx=5, pady=5)
-
-        ft = ctk.CTkFrame(tab, fg_color="transparent")
-        ft.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(15, 0))
-        
-        # Solo botón de procesamiento local
-        ctk.CTkButton(ft, text="PROCESAR TODO", width=200, height=50, command=self.procesar_todo, 
-                      font=ctk.CTkFont(size=14, weight="bold")).pack(side="right", padx=10)
-        ctk.CTkButton(ft, text="Limpiar Texto", fg_color="#64748B", hover_color="#475569", 
-                      command=self.limpiar_inputs, width=120).pack(side="left", padx=5)
 
     def limpiar_inputs(self):
         self.t0.delete("1.0", tk.END); self.t1.delete("1.0", tk.END); self.t2.delete("1.0", tk.END)

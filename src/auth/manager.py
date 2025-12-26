@@ -225,6 +225,28 @@ class AuthManager:
         """Verificación rápida de seguridad"""
         return self.is_authenticated
 
+    def is_license_active_on_device(self, username: str, device_id: str) -> bool:
+        """Retorna True si la cuenta existe, está activa y la sesión activa coincide con device_id."""
+        try:
+            conn = self._get_connection(); cur = conn.cursor()
+            cur.execute("SELECT is_active FROM usuarios WHERE username = %s", (username,))
+            row = cur.fetchone()
+            if not row:
+                cur.close(); conn.close()
+                return False
+            is_active = row[0]
+            if not is_active:
+                cur.close(); conn.close()
+                return False
+            cur.execute("SELECT device_id FROM active_sessions WHERE username = %s", (username,))
+            row2 = cur.fetchone()
+            cur.close(); conn.close()
+            if not row2:
+                return False
+            return row2[0] == device_id
+        except Exception:
+            return False
+
     def get_active_device(self, username: str) -> Optional[str]:
         """Retorna el device_id actualmente activo para un usuario, o None."""
         try:
