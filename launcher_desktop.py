@@ -312,6 +312,16 @@ class HorarioAppProfesional:
             pass
         self.lbl_user_info.configure(text="Invitado")
         messagebox.showinfo("Salir", "Sesión cerrada.")
+        # Volver al login: ocultar la ventana principal y abrir la ventana de login
+        try:
+            # Asegurar que no quede una ventana de login previa
+            if hasattr(self, 'login_win_ref') and self.login_win_ref:
+                try: self.login_win_ref.destroy()
+                except: pass
+            self.root.withdraw()
+            self.abrir_login()
+        except Exception:
+            pass
 
     def abrir_login(self):
         self.login_win_ref = ctk.CTkToplevel(self.root)
