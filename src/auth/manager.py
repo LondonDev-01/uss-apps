@@ -112,7 +112,9 @@ class AuthManager:
 
             if not is_active:
                 cursor.close(); conn.close()
-                return False, f"Cuenta '{username}' no activada. Contacta al admin para validar el pago."
+                # Mensaje claro: la cuenta no tiene licencia activa
+                return False, (f"Cuenta '{username}' no activada. "
+                                f"Migra o activa tu licencia contactando al desarrollador (onsole.neon.tech).")
 
             # Verificar expiración (si expires_at es menor a la fecha actual)
             if expires_at and expires_at < datetime.now():
@@ -134,7 +136,8 @@ class AuthManager:
                             conn.commit()
                         else:
                             cursor.close(); conn.close()
-                            return False, "Cuenta ya activa en otro dispositivo."
+                            # Mensaje orientado a migración de licencia
+                            return False, "Cuenta activa en otro dispositivo. ¿Deseas migrar la licencia a este equipo?"
                 # Insertar o actualizar la sesión
                 cursor.execute(
                     "INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s) "
@@ -188,4 +191,26 @@ class AuthManager:
             return row[0] if row else None
         except Exception:
             return None
+
+    def migrate_license(self, username: str, device_id: str) -> Tuple[bool, str]:
+        """Forza la migración de la licencia para el usuario al device_id indicado.
+
+        Nota: la validación externa de la 'clave de migración' se debe hacer en el cliente
+        (por ejemplo, comparando con un hash proporcionado por el desarrollador).
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s) "
+                "ON CONFLICT (username) DO UPDATE SET device_id = EXCLUDED.device_id, last_seen = EXCLUDED.last_seen",
+                (username, device_id, datetime.now())
+            )
+            conn.commit()
+            cursor.close(); conn.close()
+            self.is_authenticated = True
+            self.current_user = username
+            return True, "Licencia migrada correctamente."
+        except Exception as e:
+            return False, f"Error migrando licencia: {e}"
 

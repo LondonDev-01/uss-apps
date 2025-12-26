@@ -41,6 +41,7 @@ En el panel lateral puedes elegir:
 
 ### Paso E: ¡Generar!
 Dale al botón **"Generar Propuestas de Horario"**.
+> ⚠️ Nota importante: El generador **no** procesará los datos si tu cuenta no tiene una licencia activa. Si necesitas migrar tu licencia a este equipo, contacta al desarrollador en onsole.neon.tech y usa la clave que te proporcionen.
 
 ## 3. Visualizar y Exportar
 1.  Usa el botón **"Ver otra opción"** para navegar entre hasta 20 combinaciones diferentes, todas sin choques de horario.

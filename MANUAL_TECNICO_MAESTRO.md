@@ -77,6 +77,10 @@ Se removieron archivos de ejemplo y pruebas para dejar el repositorio compacto: 
     3. Ejecuta: `python build\build_release.py` (esto creará `dist\UniHorarioUSS_v<MAJOR>.<MINOR>.exe`).
     4. Si prefieres, puedo ayudarte a ejecutar este proceso en tu máquina Windows o en CI dedicado.
 
+## ⚠️ Requisitos de licencia para procesamiento
+- El generador **no** permitirá procesar ni generar propuestas si la cuenta no tiene una licencia activa.
+- Para migrar tu licencia a otro equipo debes contactar al desarrollador indicando el host `onsole.neon.tech` y proporcionar la clave de migración que se te entregue.
+
 ---
 Si quieres, puedo añadir un objetivo Makefile o un `scripts/` con comandos `make run` y `make build` para estandarizar estas instrucciones.
 ## 📦 5. Glosario de Archivos "Raros"

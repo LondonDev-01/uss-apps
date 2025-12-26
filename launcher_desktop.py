@@ -28,6 +28,8 @@ def _get_config_dir() -> Path:
 CONFIG_DIR = _get_config_dir()
 SESSION_FILE = str(CONFIG_DIR / 'user_session.json')
 DEVICE_FILE = str(CONFIG_DIR / '.device_id')
+LICENSE_MIGRATION_CONTACT = "onsole.neon.tech"
+LICENSE_MIGRATION_HASH = "882d7e18aac5f84e58c14d061e99e7d623775a0181d24e7128590725b73bdbd1"
 
 from src.auth.manager import AuthManager
 
@@ -70,6 +72,16 @@ class HorarioAppProfesional:
         self.indice_horario_actual = 0
         
         self.mapa_colores_actual = {}
+        self.ramos_json_store = {}
+        # Preferencias (crear antes de que UI pueda usarlas)
+        self.pref_no_temprano = tk.BooleanVar(value=True)
+        self.pref_no_tarde = tk.BooleanVar(value=True)
+        self.pref_sin_ventanas = tk.BooleanVar(value=True)
+        self.pref_sin_sabados = tk.BooleanVar(value=True)
+        self.modo_parser = tk.StringVar(value="Auto")
+
+        # Setup UI (crear widgets principales antes de mostrar login)
+        self.setup_ui()
         
     def _get_or_create_device_id(self) -> str:
         try:
@@ -92,16 +104,10 @@ class HorarioAppProfesional:
                 self.auth.logout(self.auth.current_user, self.device_id)
         except Exception:
             pass
-        self.root.destroy()
-        # Preferencias
-        self.pref_no_temprano = tk.BooleanVar(value=True)
-        self.pref_no_tarde = tk.BooleanVar(value=True)
-        self.pref_sin_ventanas = tk.BooleanVar(value=True)
-        self.pref_sin_sabados = tk.BooleanVar(value=True)
-        self.modo_parser = tk.StringVar(value="Auto")
-        
-        # Setup UI
-        self.setup_ui()
+        try:
+            self.root.destroy()
+        except Exception:
+            pass
         
     def setup_ui(self):
         # Header
@@ -118,6 +124,9 @@ class HorarioAppProfesional:
         self.btn_license.pack(side="right", padx=(0,10))
         self.btn_logout = ctk.CTkButton(self.header_frame, text="Cerrar sesión", width=120, height=28, fg_color="#ef4444", command=self.do_logout)
         self.btn_logout.pack(side="right", padx=(0,10))
+        # Indicador de estado de licencia (oculto si está activo)
+        self.lbl_license_status = ctk.CTkLabel(self.header_frame, text="", font=ctk.CTkFont(size=11))
+        self.lbl_license_status.pack(side="right", padx=(0,10))
         
         # Tabview Principal
         self.tabview = ctk.CTkTabview(self.root)
@@ -165,20 +174,24 @@ class HorarioAppProfesional:
                     if u and p:
                         ok, msg = self.auth.login(u, p, self.device_id)
                         if ok:
-                            self.lbl_user_info.configure(text=f"Sesión: {u}")
+                            # Mostrar estado de licencia en la etiqueta
+                            if self.auth.has_active_license():
+                                self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia activa)")
+                            else:
+                                self.lbl_user_info.configure(text=f"Sesión: {u} (Sin licencia)")
                             self.root.deiconify()
                             if hasattr(self, 'login_win_ref'): self.login_win_ref.destroy()
                         else:
                             # Si la cuenta está activa en otro dispositivo, preguntar si quiere transferir
                             if "otro dispositivo" in msg.lower():
-                                if messagebox.askyesno("Transferir licencia", "Esta cuenta está activa en otro dispositivo. ¿Deseas transferir la licencia a este equipo?"):
+                                if messagebox.askyesno("Transferir licencia", "Cuenta activa en otro dispositivo. ¿Deseas migrar la licencia a este equipo? Esta acción cerrará la sesión remota."):
                                     ok2, msg2 = self.auth.login(u, p, self.device_id, transfer=True)
                                     if ok2:
-                                        self.lbl_user_info.configure(text=f"Sesión: {u}")
+                                        self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia migrada)")
                                         self.root.deiconify()
                                         if hasattr(self, 'login_win_ref'): self.login_win_ref.destroy()
                                     else:
-                                        print("No se pudo transferir la licencia:", msg2)
+                                        messagebox.showerror("Error", f"No se pudo migrar la licencia: {msg2}")
                     else:
                         # No logged in; ensure UI shows invitado
                         self.lbl_user_info.configure(text="Invitado")
@@ -203,6 +216,8 @@ class HorarioAppProfesional:
 
         ctk.CTkLabel(win, text=f"Usuario: {cur}", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(12,6))
         ctk.CTkLabel(win, text=f"Dispositivo activo: {active if active else 'ninguno'}", font=ctk.CTkFont(size=12)).pack(pady=(0,10))
+        ctk.CTkLabel(win, text=f"Si necesitas migrar, contacta: {LICENSE_MIGRATION_CONTACT}", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(6,0))
+        ctk.CTkLabel(win, text=f"Clave de migración: {LICENSE_MIGRATION_HASH[:16]}... (proporcionada por el desarrollador)", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0,6))
 
         def do_release():
             if not active:
@@ -221,17 +236,36 @@ class HorarioAppProfesional:
 
         def do_force_transfer():
             # Pedir contraseña y forzar transferencia
+            # Ofrecer transferencia por contraseña
             pwd = ctk.CTkInputDialog(text="Ingresa tu contraseña para transferir:", title="Confirmar transferencia").get_input()
-            if not pwd:
+            if pwd:
+                ok, msg = self.auth.login(cur, pwd, self.device_id, transfer=True)
+                if ok:
+                    messagebox.showinfo("Éxito", "Licencia transferida a este equipo.")
+                    self.lbl_user_info.configure(text=f"Sesión: {cur} (Licencia migrada)")
+                    self.guardar_sesion(cur, pwd)
+                    win.destroy()
+                    self._update_license_ui()
+                    return
+                else:
+                    messagebox.showerror("Error", msg)
+
+            # Alternativa: migrar con clave del desarrollador (sin contraseña)
+            clave = ctk.CTkInputDialog(text="Ingresa la clave de migración proporcionada por el desarrollador:", title="Migrar con clave").get_input()
+            if not clave:
                 return
-            ok, msg = self.auth.login(cur, pwd, self.device_id, transfer=True)
-            if ok:
-                messagebox.showinfo("Éxito", "Licencia transferida a este equipo.")
-                self.lbl_user_info.configure(text=f"Sesión: {cur}")
-                self.guardar_sesion(cur, pwd)
-                win.destroy()
+            if clave.strip() == LICENSE_MIGRATION_HASH:
+                ok, msg = self.auth.migrate_license(cur, self.device_id)
+                if ok:
+                    messagebox.showinfo("Éxito", "Licencia migrada correctamente a este equipo.")
+                    self.lbl_user_info.configure(text=f"Sesión: {cur} (Licencia migrada)")
+                    self.guardar_sesion(cur, 'LICENSE-MIGRATION')
+                    win.destroy()
+                    self._update_license_ui()
+                else:
+                    messagebox.showerror("Error", msg)
             else:
-                messagebox.showerror("Error", msg)
+                messagebox.showerror("Error", "Clave de migración inválida. Contacta al desarrollador.")
 
         btn_rel = ctk.CTkButton(win, text="Liberar sesión remota", fg_color="#f97316", command=do_release)
         btn_rel.pack(pady=(6,4), padx=30, fill="x")
@@ -294,21 +328,38 @@ class HorarioAppProfesional:
             if ok:
                 self.guardar_sesion(u, p)
                 self.login_win_ref.destroy()
-                self.root.deiconify()
-                self.root.attributes("-zoomed", True)
-                self.lbl_user_info.configure(text=f"Sesión: {u}")
+                # Mostrar ventana principal (si aún no fue creada o está oculta)
+                try:
+                    self.root.deiconify()
+                    self.root.attributes("-zoomed", True)
+                except Exception:
+                    pass
+                # Actualizar etiqueta de usuario si existe (y mostrar estado de licencia)
+                if hasattr(self, 'lbl_user_info'):
+                    try:
+                        if self.auth.has_active_license():
+                            self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia activa)")
+                        else:
+                            self.lbl_user_info.configure(text=f"Sesión: {u} (Sin licencia)")
+                    except Exception:
+                        pass
+                # Actualizar UI relacionada a licencia
+                try:
+                    self._update_license_ui()
+                except Exception:
+                    pass
             else: messagebox.showerror("Error", msg)
 
             # Si la cuenta está activa en otro dispositivo, ofrecer transferencia
             if not ok and "otro dispositivo" in msg.lower():
-                if messagebox.askyesno("Transferir licencia", "La cuenta está activa en otro dispositivo. ¿Transferir la licencia a este equipo? Esta acción cerrará la sesión remota."):
-                    ok2, msg2 = self.auth.login(u, p, self.device_id, transfer=True)
+                    if messagebox.askyesno("Migrar licencia", "La cuenta está activa en otro dispositivo. ¿Migrar tu licencia a este dispositivo? Esta acción cerrará la sesión remota."):
+                        ok2, msg2 = self.auth.login(u, p, self.device_id, transfer=True)
                     if ok2:
                         self.guardar_sesion(u, p)
                         self.login_win_ref.destroy()
                         self.root.deiconify()
                         self.root.attributes("-zoomed", True)
-                        self.lbl_user_info.configure(text=f"Sesión: {u}")
+                        self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia migrada)")
                     else:
                         messagebox.showerror("Error", msg2)
 
@@ -378,6 +429,36 @@ class HorarioAppProfesional:
         self.menu_modo = ctk.CTkOptionMenu(pf, values=["Auto", "Tabular", "Visual", "JSON"], variable=self.modo_parser, width=120)
         self.menu_modo.pack(side="left", padx=5)
 
+    def _update_license_ui(self):
+        """Actualizar elementos visuales relacionados con la licencia (ocultar/mostrar botones y estado)."""
+        try:
+            active = self.auth.has_active_license()
+            if active:
+                # Ocultar botón de licencia si está activa
+                try:
+                    if self.btn_license.winfo_ismapped():
+                        self.btn_license.pack_forget()
+                except Exception:
+                    pass
+                # Mostrar texto de estado
+                try:
+                    self.lbl_license_status.configure(text="Licencia: Activa")
+                except Exception:
+                    pass
+            else:
+                # Mostrar el botón (si no está visible)
+                try:
+                    if not self.btn_license.winfo_ismapped():
+                        self.btn_license.pack(side="right", padx=(0,10))
+                except Exception:
+                    pass
+                try:
+                    self.lbl_license_status.configure(text="Licencia: Inactiva")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         self.t0 = ctk.CTkTextbox(tab, font=("Consolas", 13), border_width=1)
         self.t0.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
         self.t1 = ctk.CTkTextbox(tab, font=("Consolas", 13), border_width=1)
@@ -418,6 +499,10 @@ class HorarioAppProfesional:
             messagebox.showinfo("Reinicio", "Todos los datos han sido borrados.")
 
     def procesar_todo(self):
+        # Requerir licencia activa antes de procesar
+        if not self.auth.has_active_license():
+            messagebox.showwarning("Licencia requerida", f"No puedes procesar sin una licencia activa. Migra tu licencia contactando al desarrollador ({LICENSE_MIGRATION_CONTACT}) y proporciona esta llave: {LICENSE_MIGRATION_HASH}")
+            return
         self.horarios_crudos = []
         d0, d1, d2 = self.t0.get("1.0", tk.END).strip(), self.t1.get("1.0", tk.END).strip(), self.t2.get("1.0", tk.END).strip()
         modo = self.modo_parser.get()
