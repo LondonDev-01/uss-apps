@@ -12,6 +12,17 @@ Quick start (pnpm):
 
 3. Build production:
    pnpm build
+Admin API
+
+If you want to manage migration keys via HTTP locally, run the admin API server:
+
+```bash
+export ADMIN_KEY="un-secret-strong"
+export NEON_DB_URL="postgresql://..."
+python3 scripts/admin_api.py --host 127.0.0.1 --port 8001
+```
+
+Then open `http://localhost:3000/admin` in the frontend, paste the `ADMIN_KEY` and use the UI to generate/list/delete keys.
 
 Notes:
 Install required packages: `@neondatabase/neon-js` and `react-router-dom`.
