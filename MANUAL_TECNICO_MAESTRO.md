@@ -69,6 +69,13 @@ Se removieron archivos de ejemplo y pruebas para dejar el repositorio compacto: 
 ## 🗂️ Dist y ejecutables
 - El proceso de build coloca un único archivo ejecutable versionado en `dist/` con formato `UniHorarioUSS_v<MAJOR>.<MINOR>`.
 - Si ejecutas `build/build_release.py` localmente, incrementará la versión menor y generará el binario (Linux). Para Windows, el workflow de GitHub Actions puede crear el ejecutable en `dist/`.
+ - El proceso de build coloca un único archivo ejecutable versionado en `dist/` con formato `UniHorarioUSS_v<MAJOR>.<MINOR>`.
+ - Si ejecutas `build/build_release.py` localmente en **Linux**, incrementará la versión menor y generará el binario (ELF) en `dist/`.
+ - Para **Windows**: recomendamos ejecutar PyInstaller en un entorno Windows local para crear el `.exe` (no se hace cross-build desde Linux). El workflow de GitHub Actions para Windows se ha deshabilitado aquí; puedes generar el `.exe` manualmente siguiendo estos pasos:
+    1. En Windows, crea y activa un virtualenv: `python -m venv .venv` && `.venv\Scripts\activate`.
+    2. Instala dependencias: `pip install -r requirements.txt`.
+    3. Ejecuta: `python build\build_release.py` (esto creará `dist\UniHorarioUSS_v<MAJOR>.<MINOR>.exe`).
+    4. Si prefieres, puedo ayudarte a ejecutar este proceso en tu máquina Windows o en CI dedicado.
 
 ---
 Si quieres, puedo añadir un objetivo Makefile o un `scripts/` con comandos `make run` y `make build` para estandarizar estas instrucciones.
