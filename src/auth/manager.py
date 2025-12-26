@@ -48,9 +48,10 @@ class AuthManager:
             # Tabla para sesiones activas (una por usuario)
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS active_sessions (
-                    username TEXT UNIQUE NOT NULL,
+                    username TEXT NOT NULL,
                     device_id TEXT NOT NULL,
-                    last_seen TIMESTAMP
+                    last_seen TIMESTAMP,
+                    PRIMARY KEY (username, device_id)
                 )
             ''')
             # Tabla para claves de migración (validez por tiempo)
@@ -106,8 +107,32 @@ class AuthManager:
             cur.execute("INSERT INTO migration_keys (key, username, valid_until) VALUES (%s, %s, %s)", (key, username, valid_until))
             conn.commit(); cur.close(); conn.close()
             return key
-        except Exception as e:
-            raise
+        except Exception:
+            # En caso de fallo, no propagar excepción para no romper el flujo de registro;
+            # retornar None para indicar que no se creó la clave.
+            try:
+                cur.close(); conn.close()
+            except Exception:
+                pass
+            return None
+
+    def list_migration_keys(self, username: Optional[str] = None) -> list:
+        """Retorna una lista de (key, valid_until) para el username proporcionado (o todas si username es None)."""
+        try:
+            conn = self._get_connection(); cur = conn.cursor()
+            if username:
+                cur.execute("SELECT key, valid_until FROM migration_keys WHERE username = %s", (username,))
+            else:
+                cur.execute("SELECT key, username, valid_until FROM migration_keys ORDER BY valid_until DESC")
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            return rows
+        except Exception:
+            return []
+
+    # NOTE: generation/setting of user-facing migrate passwords is admin-only.
+    # The methods `set_migrate_password` and `validate_migrate_password` remain for admin use.
+    # Do NOT auto-generate or display migrate passwords to end users.
 
     def validate_migration_key(self, key: str, username: Optional[str] = None) -> bool:
         """Valida que la clave exista, opcionalmente para un username, y no haya expirado."""
@@ -132,7 +157,7 @@ class AuthManager:
         except Exception:
             pass
 
-    def register(self, username: str, password: str, telefono: Optional[str] = None) -> Tuple[bool, str]:
+    def register(self, username: str, password: str, telefono: Optional[str] = None) -> Tuple[bool, str, Optional[str]]:
         """Registra un nuevo usuario con expiración de 30 días (pero inicia como inactivo)"""
         if not username or not password:
             return False, "Usuario y contraseña son requeridos."
@@ -150,6 +175,15 @@ class AuthManager:
             conn.commit()
             cursor.close()
             conn.close()
+
+            # Generar automáticamente una clave de migración en BD (no se muestra al usuario)
+            try:
+                # Generar con validez por defecto de 365 días
+                self.generate_migration_key(username=username, days_valid=365)
+            except Exception:
+                # No bloquear el registro por fallo en generación de clave
+                pass
+
             return True, "Registro exitoso. Tu cuenta está pendiente de activación por el admin."
         except psycopg2.errors.UniqueViolation:
             return False, "El nombre de usuario ya existe."
@@ -194,27 +228,26 @@ class AuthManager:
 
             # Si se pasa device_id, gestionar la tabla de sesiones activas
             if device_id:
-                cursor.execute("SELECT device_id FROM active_sessions WHERE username = %s", (username,))
-                row = cursor.fetchone()
-                if row:
-                    current_device = row[0]
-                    if current_device != device_id:
+                # Revisar sesiones activas existentes
+                cursor.execute("SELECT device_id, last_seen FROM active_sessions WHERE username = %s ORDER BY last_seen ASC", (username,))
+                rows = cursor.fetchall()
+                existing_device_ids = [r[0] for r in rows]
+                if device_id in existing_device_ids:
+                    # Actualizar last_seen
+                    cursor.execute("UPDATE active_sessions SET last_seen = %s WHERE username = %s AND device_id = %s", (datetime.now(), username, device_id))
+                else:
+                    if len(existing_device_ids) < 2:
+                        cursor.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
+                    else:
+                        # Ya hay 2 dispositivos activos
                         if transfer:
-                            cursor.execute(
-                                "UPDATE active_sessions SET device_id = %s, last_seen = %s WHERE username = %s",
-                                (device_id, datetime.now(), username)
-                            )
-                            conn.commit()
+                            # Reemplazar la sesión más antigua
+                            oldest = existing_device_ids[0]
+                            cursor.execute("DELETE FROM active_sessions WHERE username = %s AND device_id = %s", (username, oldest))
+                            cursor.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
                         else:
                             cursor.close(); conn.close()
-                            # Mensaje orientado a migración de licencia
-                            return False, "Cuenta activa en otro dispositivo. ¿Deseas migrar la licencia a este equipo?"
-                # Insertar o actualizar la sesión
-                cursor.execute(
-                    "INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s) "
-                    "ON CONFLICT (username) DO UPDATE SET device_id = EXCLUDED.device_id, last_seen = EXCLUDED.last_seen",
-                    (username, device_id, datetime.now())
-                )
+                            return False, "Cuenta activa en 2 dispositivos. Para agregar este equipo, solicita al admin que genere una CLAVE TEMPORAL para migración."
                 conn.commit()
 
             cursor.close()

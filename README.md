@@ -48,6 +48,20 @@ src/
    - Escritorio: `python launcher_desktop.py`
    - Web: `streamlit run launcher_web.py`
 
+   ## Frontend (Vite + React)
+
+   He añadido una carpeta `frontend/` con un scaffold mínimo de Vite + React + TypeScript y placeholders para integrar Neon Auth.
+
+   Pasos rápidos:
+
+   - Entrar en la carpeta: `cd frontend`
+   - Instalar dependencias (ej. con pnpm): `pnpm install`
+   - Copiar `.env.example` a `.env` y establecer `VITE_NEON_AUTH_URL`
+   - Levantar el servidor de desarrollo: `pnpm dev`
+   - Generar la versión de producción: `pnpm build`
+
+   En `.github/workflows/build-frontend.yml` hay un workflow que compila `frontend/dist` y lo sube como artifact en pushes a `main`.
+
 ---
 
 ## 💼 Enfoque Comercial

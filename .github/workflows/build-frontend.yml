@@ -1,0 +1,30 @@
+name: Build frontend (Vite)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        working-directory: frontend
+        run: pnpm build
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist

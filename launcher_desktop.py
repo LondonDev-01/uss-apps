@@ -165,6 +165,42 @@ class HorarioAppProfesional:
         btn.pack(pady=(2, 8))
         return entry
 
+    # --- Loader (overlay modal) ---
+    def show_loader(self, text: str = "Cargando..."):
+        try:
+            if hasattr(self, '_loader_win') and self._loader_win:
+                return
+            w = ctk.CTkToplevel(self.root)
+            w.geometry("300x120")
+            w.title("")
+            w.resizable(False, False)
+            w.attributes("-topmost", True)
+            w.transient(self.root)
+            f = ctk.CTkFrame(w, fg_color=("#FFFFFF", "#1F2937"))
+            f.pack(fill="both", expand=True, padx=10, pady=10)
+            ctk.CTkLabel(f, text=text, font=ctk.CTkFont(size=12)).pack(pady=(8,6))
+            pb = ctk.CTkProgressBar(f)
+            pb.pack(fill="x", padx=10, pady=(6,8))
+            pb.configure(mode="indeterminate")
+            pb.start()
+            # Store refs
+            self._loader_win = w
+            self._loader_progress = pb
+        except Exception:
+            pass
+
+    def hide_loader(self):
+        try:
+            if hasattr(self, '_loader_progress') and self._loader_progress:
+                try: self._loader_progress.stop()
+                except: pass
+            if hasattr(self, '_loader_win') and self._loader_win:
+                try: self._loader_win.destroy()
+                except: pass
+        finally:
+            self._loader_win = None
+            self._loader_progress = None
+
     # --- ACCESO ---
     def intentar_autologin(self):
         if os.path.exists(SESSION_FILE):
@@ -234,54 +270,71 @@ class HorarioAppProfesional:
 
         ctk.CTkLabel(win, text=f"Usuario: {cur}", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(12,6))
         ctk.CTkLabel(win, text=f"Dispositivo activo: {active if active else 'ninguno'}", font=ctk.CTkFont(size=12)).pack(pady=(0,10))
-        ctk.CTkLabel(win, text=f"Si necesitas migrar, contacta: {LICENSE_MIGRATION_CONTACT}", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(6,0))
-        ctk.CTkLabel(win, text=f"Clave de migración: {LICENSE_MIGRATION_HASH[:16]}... (proporcionada por el desarrollador)", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0,6))
+        ctk.CTkLabel(win, text=f"Si necesitas migrar, contacta: {LICENSE_MIGRATION_CONTACT} (el admin generará una clave temporal)", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(6,0))
 
         def do_release():
             if not active:
-                messagebox.showinfo("Licencia", "No hay sesión remota para liberar.")
+                messagebox.showinfo("Licencia", "No hay sesión remota para liberar.", parent=win)
                 return
             if active == self.device_id:
-                messagebox.showinfo("Licencia", "La sesión activa corresponde a este equipo.")
+                messagebox.showinfo("Licencia", "La sesión activa corresponde a este equipo.", parent=win)
                 return
-            if messagebox.askyesno("Confirmar", "Liberar la sesión remota? Esto permitirá iniciar en este equipo."):
+            if messagebox.askyesno("Confirmar", "Liberar la sesión remota? Esto permitirá iniciar en este equipo.", parent=win):
                 try:
                     self.auth.logout(cur, active)
-                    messagebox.showinfo("Éxito", "Sesión remota liberada.")
+                    messagebox.showinfo("Éxito", "Sesión remota liberada.", parent=win)
                     win.destroy()
                 except Exception as e:
-                    messagebox.showerror("Error", str(e))
+                    messagebox.showerror("Error", str(e), parent=win)
 
         def do_force_transfer():
             # Pedir contraseña y forzar transferencia
             # Ofrecer transferencia por contraseña
             pwd = ctk.CTkInputDialog(text="Ingresa tu contraseña para transferir:", title="Confirmar transferencia").get_input()
             if pwd:
-                ok, msg = self.auth.login(cur, pwd, self.device_id, transfer=True)
+                try:
+                    self.show_loader("Validando contraseña...")
+                    ok, msg = self.auth.login(cur, pwd, self.device_id, transfer=True)
+                finally:
+                    self.hide_loader()
                 if ok:
-                    messagebox.showinfo("Éxito", "Licencia transferida a este equipo.")
+                    messagebox.showinfo("Éxito", "Licencia transferida a este equipo.", parent=win)
                     self.lbl_user_info.configure(text=f"Sesión: {cur} (Licencia migrada)")
                     self.guardar_sesion(cur, pwd)
                     win.destroy()
                     self._update_license_ui()
                     return
                 else:
-                    messagebox.showerror("Error", msg)
+                    # intentar con CLAVE TEMPORAL proporcionada por admin si la contraseña de usuario no funcionó
+                    mig = ctk.CTkInputDialog(text="Ingresa la CLAVE TEMPORAL proporcionada por el admin:", title="Clave temporal").get_input()
+                    if not mig:
+                        messagebox.showerror("Error", msg, parent=win)
+                        return
+                    try:
+                        self.show_loader("Validando clave temporal...")
+                        valid = self.auth.validate_migration_key(mig.strip(), cur)
+                    finally:
+                        self.hide_loader()
+                    if valid:
+                        ok2, msg2 = self.auth.login(cur, pwd, self.device_id, transfer=True)
+                        if ok2:
+                            try: self.auth.delete_migration_key(mig.strip())
+                            except: pass
+                            messagebox.showinfo("Éxito", "Licencia transferida a este equipo.", parent=win)
+                            self.lbl_user_info.configure(text=f"Sesión: {cur} (Licencia migrada)")
+                            self.guardar_sesion(cur, pwd)
+                            win.destroy(); self._update_license_ui(); return
+                        else:
+                            messagebox.showerror("Error", msg2, parent=win)
+                    else:
+                        messagebox.showerror("Error", "Clave temporal inválida o expirada.", parent=win)
 
             # Alternativa: migrar con clave (válida si está en DB y no expiró)
             clave = ctk.CTkInputDialog(text="Ingresa la clave de migración proporcionada por el admin:", title="Migrar con clave").get_input()
             if not clave:
                 return
-            valid = False
             try:
-                # Primero intentar con clave temporal
                 valid = self.auth.validate_migration_key(clave.strip(), cur)
-                # Si no es válida, intentar con la contraseña de migración del usuario
-                if not valid:
-                    valid = self.auth.validate_migrate_password(cur, clave.strip())
-                    if valid:
-                        # password-based migration: allow but do not delete server key
-                        pass
             except Exception:
                 valid = False
             if valid:
@@ -298,14 +351,15 @@ class HorarioAppProfesional:
                     win.destroy()
                     self._update_license_ui()
                 else:
-                    messagebox.showerror("Error", msg)
+                    messagebox.showerror("Error", msg, parent=win)
             else:
-                messagebox.showerror("Error", "Clave de migración inválida o expirada. Contacta al admin.")
+                messagebox.showerror("Error", "Clave temporal inválida o expirada. Solicítala al admin.", parent=win)
 
         btn_rel = ctk.CTkButton(win, text="Liberar sesión remota", fg_color="#f97316", command=do_release)
         btn_rel.pack(pady=(6,4), padx=30, fill="x")
         btn_force = ctk.CTkButton(win, text="Transferir a este equipo (clave)", fg_color="#10b981", command=do_force_transfer)
         btn_force.pack(pady=(4,10), padx=30, fill="x")
+        # Nota: las contraseñas de migración son administradas por el admin; si necesitas migrar, pide una clave temporal.
 
     def do_logout(self):
         # Cerrar sesión localmente y en servidor
@@ -366,10 +420,13 @@ class HorarioAppProfesional:
             u, p = u_e.get(), p_e.get()
             if not u or not p: return
             try:
+                self.show_loader("Validando credenciales...")
                 ok, msg = self.auth.login(u, p, self.device_id)
             except Exception as e:
-                messagebox.showerror("Error", f"Error al iniciar sesión: {e}")
+                self.hide_loader()
+                messagebox.showerror("Error", f"Error al iniciar sesión: {e}", parent=self.login_win_ref)
                 return
+            self.hide_loader()
             if ok:
                 self.guardar_sesion(u, p)
                 self.login_win_ref.destroy()
@@ -393,20 +450,35 @@ class HorarioAppProfesional:
                     self._update_license_ui()
                 except Exception:
                     pass
-            else: messagebox.showerror("Error", msg)
+            else:
+                messagebox.showerror("Error", msg, parent=self.login_win_ref)
 
-            # Si la cuenta está activa en otro dispositivo, ofrecer transferencia
-            if not ok and "otro dispositivo" in msg.lower():
-                    if messagebox.askyesno("Migrar licencia", "La cuenta está activa en otro dispositivo. ¿Migrar tu licencia a este dispositivo? Esta acción cerrará la sesión remota."):
+            # Si está bloqueado por sesiones, ofrecer ingresar una CLAVE TEMPORAL proporcionada por el admin
+            if not ok and ("otro dispositivo" in msg.lower() or "2 dispositivos" in msg.lower()):
+                if messagebox.askyesno("Migrar licencia", "La cuenta está activa en otros dispositivos. ¿Migrar tu licencia a este dispositivo? Pide al admin una CLAVE TEMPORAL y cópiala aquí.", parent=self.login_win_ref):
+                    clave = ctk.CTkInputDialog(text="Ingresa la CLAVE TEMPORAL proporcionada por el admin:", title="Clave temporal").get_input()
+                    if not clave:
+                        return
+                    try:
+                        self.show_loader("Validando clave temporal...")
+                        valid = self.auth.validate_migration_key(clave.strip(), u)
+                    finally:
+                        self.hide_loader()
+                    if valid:
                         ok2, msg2 = self.auth.login(u, p, self.device_id, transfer=True)
-                    if ok2:
-                        self.guardar_sesion(u, p)
-                        self.login_win_ref.destroy()
-                        self.root.deiconify()
-                        self.root.attributes("-zoomed", True)
-                        self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia migrada)")
+                        if ok2:
+                            # Consumir la clave temporal
+                            try: self.auth.delete_migration_key(clave.strip())
+                            except: pass
+                            self.guardar_sesion(u, p)
+                            self.login_win_ref.destroy()
+                            self.root.deiconify()
+                            self.root.attributes("-zoomed", True)
+                            self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia migrada)")
+                        else:
+                            messagebox.showerror("Error", msg2, parent=self.login_win_ref)
                     else:
-                        messagebox.showerror("Error", msg2)
+                        messagebox.showerror("Error", "Clave temporal inválida o expirada.", parent=self.login_win_ref)
 
         btn = ctk.CTkButton(card, text="INICIAR SESIÓN", command=do_login, height=48, corner_radius=10, font=("Inter", 14, "bold"))
         btn.pack(fill="x", padx=40, pady=(15, 10))
@@ -445,11 +517,16 @@ class HorarioAppProfesional:
         def do_reg():
             u, t, p1, p2 = ru.get(), rt.get(), rp1.get(), rp2.get()
             if not u or not p1 or p1 != p2:
-                messagebox.showerror("Error", "Revisa los campos y que las claves coincidan.")
+                messagebox.showerror("Error", "Revisa los campos y que las claves coincidan.", parent=reg_win)
                 return
             ok, msg = self.auth.register(u, p1, t)
-            if ok: messagebox.showinfo("Éxito", "Cuenta creada. Espera activación."); reg_win.destroy()
-            else: messagebox.showerror("Error", msg)
+            if ok:
+                info = "Cuenta creada. Espera activación."
+                info += f"\n\nNota: Si necesitas migrar la licencia en el futuro, solicita una CLAVE TEMPORAL al admin ({LICENSE_MIGRATION_CONTACT})."
+                messagebox.showinfo("Éxito", info, parent=reg_win)
+                reg_win.destroy()
+            else:
+                messagebox.showerror("Error", msg, parent=reg_win)
         
         btn = ctk.CTkButton(card, text="REGISTRARSE", command=do_reg, height=48, fg_color="#10B981", corner_radius=10)
         btn.pack(pady=20, padx=45, fill="x")
@@ -583,19 +660,23 @@ class HorarioAppProfesional:
     def procesar_todo(self):
         # Requerir licencia activa antes de procesar
         if not self.auth.has_active_license(self.device_id):
-            messagebox.showwarning("Licencia requerida", f"No puedes procesar sin una licencia activa. Migra tu licencia contactando al desarrollador ({LICENSE_MIGRATION_CONTACT}) y proporciona esta llave: {LICENSE_MIGRATION_HASH}")
+            messagebox.showwarning("Licencia requerida", f"No puedes procesar sin una licencia activa. Migra tu licencia contactando al desarrollador ({LICENSE_MIGRATION_CONTACT}) y proporciona esta llave: {LICENSE_MIGRATION_HASH}", parent=self.root)
             return
         self.horarios_crudos = []
         d0, d1, d2 = self.t0.get("1.0", tk.END).strip(), self.t1.get("1.0", tk.END).strip(), self.t2.get("1.0", tk.END).strip()
         modo = self.modo_parser.get()
         
         if not any([d0,d1,d2]): 
-            messagebox.showwarning("Atención", "No hay datos para procesar.")
+            messagebox.showwarning("Atención", "No hay datos para procesar.", parent=self.root)
             return
-            
-        if d0: self.horarios_crudos.extend(self.parser.parsear_texto_por_prioridad(d0, 0, modo=modo))
-        if d1: self.horarios_crudos.extend(self.parser.parsear_texto_por_prioridad(d1, 1, modo=modo))
-        if d2: self.horarios_crudos.extend(self.parser.parsear_texto_por_prioridad(d2, 2, modo=modo))
+        # Mostrar loader durante el procesamiento (puede bloquear la UI brevemente)
+        try:
+            self.show_loader("Procesando horarios...")
+            if d0: self.horarios_crudos.extend(self.parser.parsear_texto_por_prioridad(d0, 0, modo=modo))
+            if d1: self.horarios_crudos.extend(self.parser.parsear_texto_por_prioridad(d1, 1, modo=modo))
+            if d2: self.horarios_crudos.extend(self.parser.parsear_texto_por_prioridad(d2, 2, modo=modo))
+        finally:
+            self.hide_loader()
         
         if not self.horarios_crudos:
             messagebox.showwarning("Parser", "No se detectaron ramos válidos en el texto.\n\nAsegúrate de copiar el formato correcto del portal.")
