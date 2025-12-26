@@ -12,8 +12,23 @@ import hashlib
 from src.data.parser import ParserInteligente
 from src.core.optimizer import OptimizadorReal
 NEON_DB_URL = "postgresql://neondb_owner:REDACTED_CREDENTIAL@ep-twilight-sound-adxqbeo9-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
-SESSION_FILE = "user_session.json"
-DEVICE_FILE = ".device_id"
+
+from pathlib import Path
+
+def _get_config_dir() -> Path:
+    if os.name == 'nt':
+        base = Path(os.getenv('APPDATA', Path.home() / 'AppData' / 'Roaming')) / 'UniHorario'
+    else:
+        base = Path(os.getenv('XDG_CONFIG_HOME', Path.home() / '.config')) / 'unihorario'
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+# Ubicación de archivos de configuración/estado del usuario
+CONFIG_DIR = _get_config_dir()
+SESSION_FILE = str(CONFIG_DIR / 'user_session.json')
+DEVICE_FILE = str(CONFIG_DIR / '.device_id')
+
 from src.auth.manager import AuthManager
 
 # Configuración Global

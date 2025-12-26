@@ -7,7 +7,6 @@ ENV/
 env/
 .env
 dist/
-build/
 *.spec
 *.xlsx
 *.json
@@ -15,3 +14,4 @@ build/
 .idea/
 .vscode/
 *.log
+usuarios.db
