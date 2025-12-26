@@ -51,6 +51,14 @@ class AuthManager:
                     last_seen TIMESTAMP
                 )
             ''')
+            # Tabla para claves de migración (validez por tiempo)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS migration_keys (
+                    key TEXT PRIMARY KEY,
+                    username TEXT,
+                    valid_until TIMESTAMP
+                )
+            ''')
             conn.commit()
             cursor.close()
             conn.close()
@@ -60,6 +68,43 @@ class AuthManager:
     def _hash_password(self, password: str) -> str:
         """Genera un hash SHA-256 de la contraseña"""
         return hashlib.sha256(password.encode()).hexdigest()
+
+    # --- Migration keys management ---
+    def generate_migration_key(self, username: Optional[str] = None, days_valid: int = 5) -> str:
+        """Genera y guarda una clave de migración válida por `days_valid` días. Retorna la clave."""
+        import secrets
+        key = secrets.token_hex(32)
+        valid_until = datetime.now() + timedelta(days=days_valid)
+        try:
+            conn = self._get_connection(); cur = conn.cursor()
+            cur.execute("INSERT INTO migration_keys (key, username, valid_until) VALUES (%s, %s, %s)", (key, username, valid_until))
+            conn.commit(); cur.close(); conn.close()
+            return key
+        except Exception as e:
+            raise
+
+    def validate_migration_key(self, key: str, username: Optional[str] = None) -> bool:
+        """Valida que la clave exista, opcionalmente para un username, y no haya expirado."""
+        try:
+            conn = self._get_connection(); cur = conn.cursor()
+            if username:
+                cur.execute("SELECT valid_until FROM migration_keys WHERE key = %s AND (username = %s OR username IS NULL)", (key, username))
+            else:
+                cur.execute("SELECT valid_until FROM migration_keys WHERE key = %s", (key,))
+            row = cur.fetchone(); cur.close(); conn.close()
+            if not row: return False
+            valid_until = row[0]
+            return valid_until and valid_until >= datetime.now()
+        except Exception:
+            return False
+
+    def delete_migration_key(self, key: str):
+        try:
+            conn = self._get_connection(); cur = conn.cursor()
+            cur.execute("DELETE FROM migration_keys WHERE key = %s", (key,))
+            conn.commit(); cur.close(); conn.close()
+        except Exception:
+            pass
 
     def register(self, username: str, password: str, telefono: Optional[str] = None) -> Tuple[bool, str]:
         """Registra un nuevo usuario con expiración de 30 días (pero inicia como inactivo)"""

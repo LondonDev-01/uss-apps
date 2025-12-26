@@ -28,8 +28,7 @@ def _get_config_dir() -> Path:
 CONFIG_DIR = _get_config_dir()
 SESSION_FILE = str(CONFIG_DIR / 'user_session.json')
 DEVICE_FILE = str(CONFIG_DIR / '.device_id')
-LICENSE_MIGRATION_CONTACT = "onsole.neon.tech"
-LICENSE_MIGRATION_HASH = "882d7e18aac5f84e58c14d061e99e7d623775a0181d24e7128590725b73bdbd1"
+LICENSE_MIGRATION_CONTACT = "admin"
 
 from src.auth.manager import AuthManager
 
@@ -170,17 +169,28 @@ class HorarioAppProfesional:
             try:
                 with open(SESSION_FILE, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    u, p = data.get('u'), data.get('p')
-                    if u and p:
-                        ok, msg = self.auth.login(u, p, self.device_id)
-                        if ok:
-                            # Mostrar estado de licencia en la etiqueta
-                            if self.auth.has_active_license():
-                                self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia activa)")
-                            else:
-                                self.lbl_user_info.configure(text=f"Sesión: {u} (Sin licencia)")
+                    u = data.get('u')
+                    p = data.get('p')
+                    mig = data.get('mig')
+                    if u:
+                        if mig:
+                            # Sesión migrada anteriormente; recuperar estado sin validar contraseña
+                            self.auth.current_user = u
+                            self.auth.is_authenticated = True
+                            # Mostrar licencia migrada
+                            self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia migrada)")
                             self.root.deiconify()
                             if hasattr(self, 'login_win_ref'): self.login_win_ref.destroy()
+                        elif p:
+                            ok, msg = self.auth.login(u, p, self.device_id)
+                            if ok:
+                                # Mostrar estado de licencia en la etiqueta
+                                if self.auth.has_active_license():
+                                    self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia activa)")
+                                else:
+                                    self.lbl_user_info.configure(text=f"Sesión: {u} (Sin licencia)")
+                                self.root.deiconify()
+                                if hasattr(self, 'login_win_ref'): self.login_win_ref.destroy()
                         else:
                             # Si la cuenta está activa en otro dispositivo, preguntar si quiere transferir
                             if "otro dispositivo" in msg.lower():
@@ -199,8 +209,14 @@ class HorarioAppProfesional:
 
     def guardar_sesion(self, u, p):
         try:
+            data = {'u': u, 't': str(datetime.now()), 'device_id': self.device_id}
+            # si p tiene el marcador de migración, guardar flag separado
+            if p == 'LICENSE-MIGRATION':
+                data['mig'] = True
+            else:
+                data['p'] = p
             with open(SESSION_FILE, 'w', encoding='utf-8') as f:
-                json.dump({'u': u, 'p': p, 't': str(datetime.now()), 'device_id': self.device_id}, f)
+                json.dump(data, f)
         except: pass
 
     def open_license_manager(self):
@@ -250,13 +266,21 @@ class HorarioAppProfesional:
                 else:
                     messagebox.showerror("Error", msg)
 
-            # Alternativa: migrar con clave del desarrollador (sin contraseña)
-            clave = ctk.CTkInputDialog(text="Ingresa la clave de migración proporcionada por el desarrollador:", title="Migrar con clave").get_input()
+            # Alternativa: migrar con clave (válida si está en DB y no expiró)
+            clave = ctk.CTkInputDialog(text="Ingresa la clave de migración proporcionada por el admin:", title="Migrar con clave").get_input()
             if not clave:
                 return
-            if clave.strip() == LICENSE_MIGRATION_HASH:
+            valid = False
+            try:
+                valid = self.auth.validate_migration_key(clave.strip(), cur)
+            except Exception:
+                valid = False
+            if valid:
                 ok, msg = self.auth.migrate_license(cur, self.device_id)
                 if ok:
+                    # borrar clave usada
+                    try: self.auth.delete_migration_key(clave.strip())
+                    except: pass
                     messagebox.showinfo("Éxito", "Licencia migrada correctamente a este equipo.")
                     self.lbl_user_info.configure(text=f"Sesión: {cur} (Licencia migrada)")
                     self.guardar_sesion(cur, 'LICENSE-MIGRATION')
@@ -265,7 +289,7 @@ class HorarioAppProfesional:
                 else:
                     messagebox.showerror("Error", msg)
             else:
-                messagebox.showerror("Error", "Clave de migración inválida. Contacta al desarrollador.")
+                messagebox.showerror("Error", "Clave de migración inválida o expirada. Contacta al admin.")
 
         btn_rel = ctk.CTkButton(win, text="Liberar sesión remota", fg_color="#f97316", command=do_release)
         btn_rel.pack(pady=(6,4), padx=30, fill="x")
