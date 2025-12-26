@@ -60,6 +60,12 @@ jobs:
         with:
           name: windows-build-logs
           path: build_windows_output.txt
+      - name: Show build log in job output
+        if: always()
+        run: |
+          echo "==== BUILD LOG START ===="
+          type build_windows_output.txt || echo "(no build log)"
+          echo "==== BUILD LOG END ===="
       - name: Read version
         id: get_version
         run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
