@@ -33,6 +33,16 @@ yarn:
 yarn add @neondatabase/neon-js react-router-dom
 ```
 
-- To produce a distributable app you can either:
   - Serve the `dist/` static files (recommended) using any static server.
   - Wrap with Electron or Tauri if you need native executables.
+
+Note: the scaffold includes a placeholder import for Neon; after installing, update `src/lib/auth.ts` to use the actual client/API from `@neondatabase/neon-js` as per the SDK docs.
+
+When you install `@neondatabase/neon-js`, update `src/lib/auth.ts` to export the real `NeonAuthUIProvider` (or similar) and then the `NeonAuthProvider` in `src/main.tsx` will wire it into the app.
+
+Example replacement (pseudo-code):
+
+```tsx
+import { NeonAuthUIProvider } from '@neondatabase/neon-js'
+// then use <NeonAuthUIProvider config={{ url: import.meta.env.VITE_NEON_AUTH_URL }}>
+```
