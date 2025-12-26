@@ -41,6 +41,44 @@ El proyecto sigue una estructura modular para que sea fácil de mantener y escal
 5. **OpenPyXL:** Para crear los archivos Excel desde cero.
 6. **PyInstaller:** El "empaquetador" que convierte el código Python en un archivo `.exe` que corre en cualquier PC sin necesidad de instalar nada.
 
+## ▶️ Quick Start (Desarrollador y Usuario)
+
+1. Requisitos mínimos:
+   - Python 3.10+ instalado
+   - Instalar dependencias: `pip install -r requirements.txt`
+
+2. Ejecutar la aplicación (forma recomendada):
+   - Usar el lanzador incluido:
+     - Linux/macOS: `./build/unihorario`
+     - Windows (si se creó un .exe): `dist/UniHorarioUSS.exe` (si aplica)
+   - Alternativa: `python launcher_desktop.py`
+
+3. Generar ejecutable (opcional):
+   - Si quieres un `.exe` o binario, usa PyInstaller con la spec adecuada (ejemplo):
+     `pyinstaller UniHorarioUSS_Oficial.spec --noconfirm`
+   - Después de crear el ejecutable, **las `.spec` ya no son estrictamente necesarias** y se pueden eliminar del repositorio si prefieres mantenerlo limpio.
+
+## 🔄 Notas de Limpieza
+Se removieron archivos de ejemplo y pruebas para dejar el repositorio compacto: `tests/`, imágenes de ayuda y builds intermedios. Se conserva `src/` (código), `README.md`, `MANUAL_TECNICO_MAESTRO.md` y `GUIA_USUARIO.txt`.
+
+## 💾 Dónde se guardan datos del usuario
+- Las sesiones y archivos de estado del usuario ya NO se guardan en el root del repo.
+- En Linux/macOS: `~/.config/unihorario/user_session.json`
+- En Windows: `%APPDATA%\UniHorario\user_session.json`
+
+## 🗂️ Dist y ejecutables
+- El proceso de build coloca un único archivo ejecutable versionado en `dist/` con formato `UniHorarioUSS_v<MAJOR>.<MINOR>`.
+- Si ejecutas `build/build_release.py` localmente, incrementará la versión menor y generará el binario (Linux). Para Windows, el workflow de GitHub Actions puede crear el ejecutable en `dist/`.
+ - El proceso de build coloca un único archivo ejecutable versionado en `dist/` con formato `UniHorarioUSS_v<MAJOR>.<MINOR>`.
+ - Si ejecutas `build/build_release.py` localmente en **Linux**, incrementará la versión menor y generará el binario (ELF) en `dist/`.
+ - Para **Windows**: recomendamos ejecutar PyInstaller en un entorno Windows local para crear el `.exe` (no se hace cross-build desde Linux). El workflow de GitHub Actions para Windows se ha deshabilitado aquí; puedes generar el `.exe` manualmente siguiendo estos pasos:
+    1. En Windows, crea y activa un virtualenv: `python -m venv .venv` && `.venv\Scripts\activate`.
+    2. Instala dependencias: `pip install -r requirements.txt`.
+    3. Ejecuta: `python build\build_release.py` (esto creará `dist\UniHorarioUSS_v<MAJOR>.<MINOR>.exe`).
+    4. Si prefieres, puedo ayudarte a ejecutar este proceso en tu máquina Windows o en CI dedicado.
+
+---
+Si quieres, puedo añadir un objetivo Makefile o un `scripts/` con comandos `make run` y `make build` para estandarizar estas instrucciones.
 ## 📦 5. Glosario de Archivos "Raros"
 - **`.spec`**: Archivos de configuración de PyInstaller. Dicen qué carpetas e imágenes meter dentro del `.exe`. Se pueden borrar después de crear el ejecutable.
 - **`__pycache__`**: Carpetas que crea Python para que el código corra más rápido. Son basura, se pueden borrar.

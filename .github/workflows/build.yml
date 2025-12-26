@@ -1,0 +1,29 @@
+name: Build Releases
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    # Windows builds are manual and should be executed locally on Windows
+    # to produce a native .exe (or via a dedicated runner if desired).
+        id: get_version
+        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
+      - name: Commit built exe and VERSION back to repo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/* VERSION || true
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore(release): add windows build UniHorarioUSS_v${{ steps.get_version.outputs.version }} [skip ci]"
+            git push origin HEAD:clean-release
+          fi
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unihorario-windows
+          path: dist/

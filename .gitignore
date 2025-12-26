@@ -7,14 +7,17 @@ ENV/
 env/
 .env
 dist/
-build/
-*.spec
 *.xlsx
 *.json
 .streamlit/
 .idea/
 .vscode/
 *.log
+<<<<<<< HEAD
 
 # Local device id used by dev environment
 .device_id
+usuarios.db
+=======
+usuarios.db
+>>>>>>> 5f8e0a1918c5b4913fa18bb68d601e43c244fbce

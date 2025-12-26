@@ -5,3 +5,4 @@ xlsxwriter
 pyperclip==1.8.2
 customtkinter
 psycopg2-binary
+pyinstaller

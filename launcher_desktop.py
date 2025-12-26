@@ -12,11 +12,27 @@ import hashlib
 from src.data.parser import ParserInteligente
 from src.core.optimizer import OptimizadorReal
 NEON_DB_URL = "postgresql://neondb_owner:REDACTED_CREDENTIAL@ep-twilight-sound-adxqbeo9-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
-SESSION_FILE = "user_session.json"
-DEVICE_FILE = ".device_id"
+
+from pathlib import Path
+
+def _get_config_dir() -> Path:
+    if os.name == 'nt':
+        base = Path(os.getenv('APPDATA', Path.home() / 'AppData' / 'Roaming')) / 'UniHorario'
+    else:
+        base = Path(os.getenv('XDG_CONFIG_HOME', Path.home() / '.config')) / 'unihorario'
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+# Ubicación de archivos de configuración/estado del usuario
+CONFIG_DIR = _get_config_dir()
+SESSION_FILE = str(CONFIG_DIR / 'user_session.json')
+DEVICE_FILE = str(CONFIG_DIR / '.device_id')
+
 from src.auth.manager import AuthManager
 
 # Configuración Global
+ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
 class HorarioAppProfesional:
@@ -36,10 +52,10 @@ class HorarioAppProfesional:
         
         # Ocultar ventana principal hasta login
         self.root.withdraw()
-        self.abrir_login()
-        
-        # Generar/recuperar device id y luego intentar autologin
+        # Generar/recuperar device id antes de abrir UI de login (evita condiciones de carrera)
         self.device_id = self._get_or_create_device_id()
+        self.abrir_login()
+        # Intentar autologin después de un breve delay
         self.root.after(500, self.intentar_autologin)
 
         # Asegurar cierre limpio (revocar sesión activa en servidor)
@@ -270,7 +286,11 @@ class HorarioAppProfesional:
         def do_login(event=None):
             u, p = u_e.get(), p_e.get()
             if not u or not p: return
-            ok, msg = self.auth.login(u, p, self.device_id)
+            try:
+                ok, msg = self.auth.login(u, p, self.device_id)
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al iniciar sesión: {e}")
+                return
             if ok:
                 self.guardar_sesion(u, p)
                 self.login_win_ref.destroy()
