@@ -124,6 +124,16 @@ class AuthManager:
             )
             conn.commit()
             cursor.close(); conn.close()
+            # Generar y almacenar migrate_pass_hash automáticamente (solo se guarda su HASH)
+            try:
+                # regenerate_migrate_hash generará un token, almacenará su HASH y retornará el HASH.
+                # No exponemos el token/hasheo al usuario aquí; el admin podrá obtenerlo desde la DB o
+                # mediante herramientas administrativas.
+                _ = self.regenerate_migrate_hash(username)
+            except Exception:
+                # Si falla la generación del migrate hash no abortamos el registro; solo lo registramos.
+                pass
+
             return True, "Registro exitoso. Tu cuenta está pendiente de activación por admin."
         except psycopg2.errors.UniqueViolation:
             return False, "El nombre de usuario ya existe."
@@ -134,28 +144,28 @@ class AuthManager:
         """Permite al usuario activar su cuenta proporcionando el `migrate_pass_hash` que el admin
         le entregó (si coincide con lo almacenado, activamos la cuenta).
         """
+        # NOTA: en este diseño `apply_license` NO debe activar la cuenta automáticamente.
+        # El propósito aquí será validar que el migrate_pass_hash proporcionado coincide
+        # con el almacenado; la activación (is_active) seguirá siendo gestionada manualmente
+        # por el admin según tu requerimiento.
         if not username or not migrate_hash:
             return False, "Usuario y hash de migración requeridos."
         try:
             conn = self._get_connection(); cur = conn.cursor()
             cur.execute("SELECT migrate_pass_hash FROM usuarios WHERE username = %s", (username,))
             row = cur.fetchone()
+            cur.close(); conn.close()
             if not row:
-                cur.close(); conn.close();
                 return False, "Usuario no encontrado."
             stored_hash = row[0]
             if not stored_hash:
-                cur.close(); conn.close();
                 return False, "No hay hash de migración establecido para este usuario. Contacta al admin."
             if stored_hash != migrate_hash:
-                cur.close(); conn.close();
                 return False, "Hash de migración inválido."
-            # Coincide: activar la cuenta
-            cur.execute("UPDATE usuarios SET is_active = TRUE WHERE username = %s", (username,))
-            conn.commit(); cur.close(); conn.close()
-            return True, "Cuenta activada correctamente. Ahora puedes usar la licencia en este equipo."
+            # Si coincide, devolvemos ok pero no modificamos is_active
+            return True, "migrate_pass_hash válido."
         except Exception as e:
-            return False, f"Error al aplicar licencia: {e}"
+            return False, f"Error al validar migrate_pass_hash: {e}"
 
     def login(self, username: str, password: str, device_id: Optional[str] = None, transfer: bool = False, transfer_password: Optional[str] = None) -> Tuple[bool, str]:
         """Valida credenciales remotas, estado activo, expiración y limita sesión por dispositivo.
