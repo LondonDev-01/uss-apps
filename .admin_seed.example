@@ -1,0 +1,5 @@
+# Copy to .admin_seed (gitignored) and fill values for local convenience
+ADMIN_USERNAME=Subaru
+ADMIN_PASSWORD=Subaru#programmer0
+NEON_DB_URL=postgresql://... (your neon db url)
+ADMIN_KEY=some-secret-key
