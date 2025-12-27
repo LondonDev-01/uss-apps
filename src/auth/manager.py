@@ -33,6 +33,7 @@ class AuthManager:
                     username TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
                     is_active BOOLEAN DEFAULT FALSE,
+                    is_admin BOOLEAN DEFAULT FALSE,
                     expires_at TIMESTAMP,
                     telefono TEXT,
                     migrate_pass_hash TEXT
@@ -44,6 +45,7 @@ class AuthManager:
                 ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP,
                 ADD COLUMN IF NOT EXISTS telefono TEXT
                 , ADD COLUMN IF NOT EXISTS migrate_pass_hash TEXT
+                , ADD COLUMN IF NOT EXISTS is_admin BOOLEAN
             ''')
             # Tabla para sesiones activas (una por usuario)
             cursor.execute('''
@@ -157,7 +159,7 @@ class AuthManager:
         except Exception:
             pass
 
-    def register(self, username: str, password: str, telefono: Optional[str] = None) -> Tuple[bool, str, Optional[str]]:
+    def register(self, username: str, password: str, telefono: Optional[str] = None) -> Tuple[bool, str]:
         """Registra un nuevo usuario con expiración de 30 días (pero inicia como inactivo)"""
         if not username or not password:
             return False, "Usuario y contraseña son requeridos."
@@ -189,6 +191,42 @@ class AuthManager:
             return False, "El nombre de usuario ya existe."
         except Exception as e:
             return False, f"Error al registrar: {str(e)}"
+
+    def create_or_promote_admin(self, username: str, password: str) -> Tuple[bool, str]:
+        """Crea o promueve un usuario a admin. Activa la cuenta y setea la contraseña.
+
+        Esta operación debe ejecutarse por el admin local (no desde clientes).
+        """
+        if not username or not password:
+            return False, "Usuario y contraseña requeridos."
+        try:
+            conn = self._get_connection(); cur = conn.cursor()
+            cur.execute("SELECT id FROM usuarios WHERE username = %s", (username,))
+            row = cur.fetchone()
+            if row:
+                cur.execute("UPDATE usuarios SET password_hash = %s, is_active = TRUE, is_admin = TRUE WHERE username = %s", (self._hash_password(password), username))
+            else:
+                expires = datetime.now() + timedelta(days=365)
+                cur.execute("INSERT INTO usuarios (username, password_hash, is_active, is_admin, expires_at) VALUES (%s, %s, TRUE, TRUE, %s)", (username, self._hash_password(password), expires))
+            conn.commit(); cur.close(); conn.close()
+            return True, "Admin creado/actualizado correctamente."
+        except Exception as e:
+            return False, f"Error creando admin: {e}"
+
+    def validate_admin_credentials(self, username: str, password: str) -> bool:
+        """Valida que las credenciales correspondan a un admin activo."""
+        try:
+            conn = self._get_connection(); cur = conn.cursor()
+            cur.execute("SELECT password_hash, is_admin, is_active FROM usuarios WHERE username = %s", (username,))
+            row = cur.fetchone(); cur.close(); conn.close()
+            if not row:
+                return False
+            db_hash, is_admin, is_active = row
+            if not is_admin or not is_active:
+                return False
+            return db_hash == self._hash_password(password)
+        except Exception:
+            return False
 
     def login(self, username: str, password: str, device_id: Optional[str] = None, transfer: bool = False) -> Tuple[bool, str]:
         """Valida credenciales remotas, estado activo, expiración y limita sesión por dispositivo.

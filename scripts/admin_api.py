@@ -26,9 +26,26 @@ if not DB_URL:
     DB_URL = os.getenv('NEON_DB_URL', '')
 
 def require_admin(req):
+    # First check static ADMIN_KEY header
     key = req.headers.get('X-ADMIN-KEY')
-    if not key or not ADMIN_KEY or key != ADMIN_KEY:
-        abort(401, 'Unauthorized')
+    if key and ADMIN_KEY and key == ADMIN_KEY:
+        return
+
+    # Fallback: Basic auth with an admin user
+    auth = req.headers.get('Authorization')
+    if auth and auth.lower().startswith('basic '):
+        import base64
+        try:
+            b64 = auth.split(' ', 1)[1]
+            dec = base64.b64decode(b64).decode('utf-8')
+            user, pwd = dec.split(':', 1)
+            am = AuthManager(DB_URL)
+            if am.validate_admin_credentials(user, pwd):
+                return
+        except Exception:
+            pass
+
+    abort(401, 'Unauthorized')
 
 @app.route('/keys', methods=['GET'])
 def list_keys():
