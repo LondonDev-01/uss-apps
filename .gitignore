@@ -18,6 +18,8 @@ dist/
 # Local device id used by dev environment
 .device_id
 usuarios.db
+# Local admin seed (do NOT commit credentials)
+.admin_seed
 =======
 usuarios.db
 >>>>>>> 5f8e0a1918c5b4913fa18bb68d601e43c244fbce
