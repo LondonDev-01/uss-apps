@@ -387,19 +387,30 @@ class HorarioAppProfesional:
         # - placeholder en gris
         opts = dict(height=self._entry_height, fg_color="transparent", text_color="white", placeholder_text_color="gray", corner_radius=8)
         opts.update(kwargs)
-        entry = ctk.CTkEntry(parent, placeholder_text=placeholder, show="*", **opts)
-        entry.pack(fill="x", padx=self._entry_padx, pady=self._entry_pady)
 
+        # Contenedor que mantiene el entry y el botón en la misma fila
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.pack(fill="x", padx=self._entry_padx, pady=self._entry_pady)
+        frame.grid_columnconfigure(0, weight=1)
+
+        entry = ctk.CTkEntry(frame, placeholder_text=placeholder, show="*", **opts)
+        entry.grid(row=0, column=0, sticky='ew')
+
+        # Botón lateral para mostrar/ocultar contraseña, altura igual al entry para que parezcan del mismo porte
         def toggle():
             current = entry.cget("show")
             new_show = "" if current == "*" else "*"
             entry.configure(show=new_show)
-            btn.configure(text="🔒 OCULTAR" if current == "*" else "👁️ MOSTRAR")
+            try:
+                btn.configure(text="🔒 OCULTAR" if current == "*" else "👁️ MOSTRAR")
+            except Exception:
+                pass
 
-        btn = ctk.CTkButton(parent, text="👁️ MOSTRAR", height=25, width=100,
+        btn = ctk.CTkButton(frame, text="👁️ MOSTRAR", height=self._entry_height, width=110,
                             fg_color="transparent", text_color="#3B82F6",
                             font=("Inter", 11, "bold"), command=toggle)
-        btn.pack(pady=(2, 8))
+        btn.grid(row=0, column=1, padx=(8,0))
+
         return entry
 
     # --- ACCESO ---
