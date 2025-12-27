@@ -65,8 +65,16 @@ class HorarioAppProfesional:
         self.root.title("UniHorario USS Profesional")
         self.root.geometry("1400x900")
 
-        # Obligar Pantalla Completa
-        self.root.attributes("-zoomed", True)
+        # Obligar Pantalla Completa y no redimensionable
+        # Mostrar en pantalla completa al iniciar (permitir minimizar/cerrar desde WM)
+        try:
+            self.root.attributes("-zoomed", True)
+        except Exception:
+            pass
+        try:
+            self.root.attributes("-fullscreen", True)
+        except Exception:
+            pass
         self.root.resizable(False, False)
 
         # Componentes lógicos
@@ -163,7 +171,7 @@ class HorarioAppProfesional:
         self.tabview = ctk.CTkTabview(self.root)
         self.tabview.pack(fill="both", expand=True, padx=20, pady=10)
 
-        self.tabview.add("1. Datos del Portal")
+        self.tabview.add("1. Introducir Ramos")
         self.tabview.add("2. Datos Procesados")
         self.tabview.add("3. Horario Optimizado")
         self.tabview.add("4. Exportar")
@@ -374,11 +382,55 @@ class HorarioAppProfesional:
 
     def setup_tab_entrada(self):
         try:
-            tab = self.tabview.tab('1. Datos del Portal')
-            tab.grid_columnconfigure((0,1,2), weight=1); tab.grid_rowconfigure(2, weight=1)
-            self.t0 = ctk.CTkTextbox(tab, font=('Consolas',12), border_width=1); self.t0.grid(row=2, column=0, sticky='nsew', padx=5, pady=5)
-            self.t1 = ctk.CTkTextbox(tab, font=('Consolas',12), border_width=1); self.t1.grid(row=2, column=1, sticky='nsew', padx=5, pady=5)
-            self.t2 = ctk.CTkTextbox(tab, font=('Consolas',12), border_width=1); self.t2.grid(row=2, column=2, sticky='nsew', padx=5, pady=5)
+            tab = self.tabview.tab('1. Introducir Ramos')
+            # Disposición: filtros arriba, luego 3 columnas de inputs "Datos del portal", y botones al final
+            tab.grid_columnconfigure((0,1,2), weight=1)
+            # Filtros (preferencias) en fila 0 spanning las 3 columnas
+            filters_frame = ctk.CTkFrame(tab, fg_color='transparent')
+            filters_frame.grid(row=0, column=0, columnspan=3, sticky='ew', pady=(8,6), padx=10)
+            filters_frame.grid_columnconfigure((0,1,2,3), weight=1)
+            # Checkboxes para preferencias (usar las BooleanVar ya definidas en __init__)
+            try:
+                ctk.CTkCheckBox(filters_frame, text='Priorizar NO entrar temprano', variable=self.pref_no_temprano).grid(row=0, column=0, sticky='w', padx=8)
+                ctk.CTkCheckBox(filters_frame, text='Priorizar NO salir tarde', variable=self.pref_no_tarde).grid(row=0, column=1, sticky='w', padx=8)
+                ctk.CTkCheckBox(filters_frame, text='Evitar ventanas largas', variable=self.pref_sin_ventanas).grid(row=0, column=2, sticky='w', padx=8)
+                ctk.CTkCheckBox(filters_frame, text='Quitar sábados', variable=self.pref_sin_sabados).grid(row=0, column=3, sticky='w', padx=8)
+            except Exception:
+                # Fallback si el widget no está disponible
+                try:
+                    ctk.CTkLabel(filters_frame, text='[Filtros de preferencia no disponibles]').grid(row=0, column=0, padx=8)
+                except Exception:
+                    pass
+
+            # Títulos encima de cada columna (centrados)
+            labels_frame = ctk.CTkFrame(tab, fg_color='transparent')
+            # Aumentar padding vertical entre filtros y títulos
+            labels_frame.grid(row=1, column=0, columnspan=3, sticky='ew', padx=5, pady=(14,6))
+            labels_frame.grid_columnconfigure((0,1,2), weight=1)
+            ctk.CTkLabel(labels_frame, text='RAMOS PRIORIDAD', anchor='center', font=ctk.CTkFont(size=12, weight='bold')).grid(row=0, column=0, sticky='ew')
+            ctk.CTkLabel(labels_frame, text='RAMOS OPCIONALES', anchor='center', font=ctk.CTkFont(size=12, weight='bold')).grid(row=0, column=1, sticky='ew')
+            ctk.CTkLabel(labels_frame, text='ELECTIVOS (PEGA AQUI LOS ELEC, SI NO SABES CUAL ELEGIR)', anchor='center', font=ctk.CTkFont(size=11), wraplength=280).grid(row=0, column=2, sticky='ew')
+
+            # Textboxes con los datos pegados (fila 2)
+            tab.grid_rowconfigure(2, weight=1)
+            self.t0 = ctk.CTkTextbox(tab, font=('Consolas',12), border_width=1)
+            self.t0.grid(row=2, column=0, sticky='nsew', padx=5, pady=5)
+            self.t1 = ctk.CTkTextbox(tab, font=('Consolas',12), border_width=1)
+            self.t1.grid(row=2, column=1, sticky='nsew', padx=5, pady=5)
+            self.t2 = ctk.CTkTextbox(tab, font=('Consolas',12), border_width=1)
+            self.t2.grid(row=2, column=2, sticky='nsew', padx=5, pady=5)
+
+            # Botones de acción (limpiar y procesar) en fila 3
+            btn_frame = ctk.CTkFrame(tab, fg_color='transparent')
+            btn_frame.grid(row=3, column=0, columnspan=3, sticky='ew', pady=(6,12))
+            btn_frame.grid_columnconfigure((0,1,2), weight=1)
+            ctk.CTkButton(btn_frame, text='Limpiar inputs', fg_color='transparent', command=self.limpiar_inputs, width=180).grid(row=0, column=0, padx=20)
+            ctk.CTkButton(btn_frame, text='Procesar Ramos', fg_color='#2563EB', command=self.procesar_todo, width=220, height=42).grid(row=0, column=1)
+            # No mostrar modo invitado aquí: button eliminado por seguridad de licencia
+            # (anteriormente: Modo Invitado)
+            # Reservado: espacio en columna 2 para equilibrio visual
+            ctk.CTkFrame(btn_frame, fg_color='transparent').grid(row=0, column=2, padx=20)
+
         except Exception as e:
             _write_log(f'setup_tab_entrada error: {e}')
 
@@ -648,15 +700,23 @@ class HorarioAppProfesional:
                 self.guardar_sesion(u, p)
             except Exception:
                 pass
+            # Cerrar la ventana de login SIEMPRE cuando el login sea exitoso (autologin incluido)
             try:
-                if hasattr(self, 'login_win_ref') and not autologin:
-                    try: self.login_win_ref.destroy()
-                    except: pass
+                if hasattr(self, 'login_win_ref') and self.login_win_ref:
+                    try:
+                        self.login_win_ref.destroy()
+                    except Exception:
+                        pass
+                    self.login_win_ref = None
             except Exception:
                 pass
             try:
                 self.root.deiconify()
-                self.root.attributes("-zoomed", True)
+                # asegurar fullscreen visible
+                try: self.root.attributes("-zoomed", True)
+                except: pass
+                try: self.root.attributes("-fullscreen", True)
+                except: pass
             except Exception:
                 pass
             try:
@@ -758,7 +818,12 @@ class HorarioAppProfesional:
             for w in self.scroll_j.winfo_children(): w.destroy()
 
             self.lbl_nav.configure(text="Propuesta 0 de 0")
-            self.tabview.set("1. Datos del Portal")
+            # Asegurar nombre de pestaña actualizado
+            try:
+                self.tabview.set("1. Introducir Ramos")
+            except Exception:
+                try: self.tabview.set("1. Datos del Portal")
+                except Exception: pass
             messagebox.showinfo("Reinicio", "Todos los datos han sido borrados.")
 
     def procesar_todo(self):
@@ -766,23 +831,53 @@ class HorarioAppProfesional:
         if not self.auth.has_active_license(self.device_id):
             messagebox.showwarning("Licencia requerida", f"No puedes procesar sin una licencia activa. Migra tu licencia contactando al desarrollador ({LICENSE_MIGRATION_CONTACT}) y proporciona esta llave: {LICENSE_MIGRATION_HASH}")
             return
-        self.horarios_crudos = []
+
+        # Leer datos de UI (rápido) y delegar el parsing a un hilo para no bloquear la UI
         d0, d1, d2 = self.t0.get("1.0", tk.END).strip(), self.t1.get("1.0", tk.END).strip(), self.t2.get("1.0", tk.END).strip()
         modo = self.modo_parser.get()
 
-        if not any([d0,d1,d2]):
+        if not any([d0, d1, d2]):
             messagebox.showwarning("Atención", "No hay datos para procesar.")
             return
 
-        if d0: self.horarios_crudos.extend(self.parser.parsear_texto_por_prioridad(d0, 0, modo=modo))
-        if d1: self.horarios_crudos.extend(self.parser.parsear_texto_por_prioridad(d1, 1, modo=modo))
-        if d2: self.horarios_crudos.extend(self.parser.parsear_texto_por_prioridad(d2, 2, modo=modo))
+        self.show_loader('Procesando ramos...', block=False)
 
-        if not self.horarios_crudos:
-            messagebox.showwarning("Parser", "No se detectaron ramos válidos en el texto.\n\nAsegúrate de copiar el formato correcto del portal.")
-            return
+        def _parse_task():
+            try:
+                parsed = []
+                if d0:
+                    parsed.extend(self.parser.parsear_texto_por_prioridad(d0, 0, modo=modo))
+                if d1:
+                    parsed.extend(self.parser.parsear_texto_por_prioridad(d1, 1, modo=modo))
+                if d2:
+                    parsed.extend(self.parser.parsear_texto_por_prioridad(d2, 2, modo=modo))
+            except Exception as e:
+                parsed = None
+                err = str(e)
 
-        self._avanzar()
+            def _on_done():
+                try:
+                    self.hide_loader()
+                except Exception:
+                    pass
+                if parsed is None:
+                    messagebox.showerror('Parser', f'Error procesando los datos: {err}')
+                    return
+                self.horarios_crudos = parsed
+                if not self.horarios_crudos:
+                    messagebox.showwarning('Parser', 'No se detectaron ramos válidos en el texto.\n\nAsegúrate de copiar el formato correcto del portal.')
+                    return
+                try:
+                    self._avanzar()
+                except Exception as e:
+                    messagebox.showerror('Parser', f'Error al cargar los datos: {e}')
+
+            try:
+                self.root.after(0, _on_done)
+            except Exception:
+                _on_done()
+
+        threading.Thread(target=_parse_task, daemon=True).start()
 
     def _avanzar(self):
         ramos = defaultdict(list)
@@ -858,12 +953,43 @@ class HorarioAppProfesional:
 
     def generar_final(self):
         try:
-            cand = self.optimizer.procesar_selecciones_usuario(self.selecciones_usuario)
+            # Ejecutar optimización en background para no bloquear la UI
             prefs = {'no_temprano': self.pref_no_temprano.get(), 'no_tarde': self.pref_no_tarde.get(), 'sin_ventanas': self.pref_sin_ventanas.get(), 'sin_sabados': self.pref_sin_sabados.get()}
-            self.mejores_horarios, m = self.optimizer.generar_top_horarios(cand, top_n=20, preferencias=prefs)
-            if not self.mejores_horarios: messagebox.showerror("Error", m); return
-            self.indice_horario_actual = 0; self.render_grid(); self.tabview.set("3. Horario Optimizado")
-        except Exception as e: messagebox.showerror("Generador", str(e))
+            self.show_loader('Generando horarios...')
+
+            def _gen_task():
+                try:
+                    cand = self.optimizer.procesar_selecciones_usuario(self.selecciones_usuario)
+                    mejores, msg = self.optimizer.generar_top_horarios(cand, top_n=20, preferencias=prefs)
+                except Exception as e:
+                    mejores, msg = None, str(e)
+
+                def _on_done():
+                    try: self.hide_loader()
+                    except Exception: pass
+                    if mejores is None:
+                        messagebox.showerror('Generador', f'Error generando horarios: {msg}')
+                        return
+                    if not mejores:
+                        messagebox.showerror('Generador', msg)
+                        return
+                    self.mejores_horarios = mejores
+                    self.indice_horario_actual = 0
+                    try:
+                        self.render_grid()
+                        self.tabview.set('3. Horario Optimizado')
+                    except Exception as e:
+                        messagebox.showerror('Generador', f'Error actualizando UI: {e}')
+
+                try:
+                    self.root.after(0, _on_done)
+                except Exception:
+                    _on_done()
+
+            threading.Thread(target=_gen_task, daemon=True).start()
+
+        except Exception as e:
+            messagebox.showerror("Generador", str(e))
 
     # --- PESTAÑA 3: GRID (CORREGIDO) ---
     def setup_tab_horario(self):
@@ -913,7 +1039,12 @@ class HorarioAppProfesional:
         for w in self.scroll_g.winfo_children(): w.destroy()
         for w in self.legend_c.winfo_children(): w.destroy()
         if not self.mejores_horarios:
-            self.txt_export_json.delete("1.0", tk.END)
+            # Borrar contenido del editor JSON si existe (usar wrapper seguro)
+            try:
+                if hasattr(self, 'txt_export_json') and getattr(self.txt_export_json, 'winfo_exists', lambda: False)():
+                    self.txt_export_json.delete("1.0", tk.END)
+            except Exception:
+                pass
             return
 
         self.lbl_nav.configure(text=f"Propuesta {self.indice_horario_actual + 1} de {len(self.mejores_horarios)}")
@@ -926,11 +1057,36 @@ class HorarioAppProfesional:
                 "nrc": c.nrc, "titulo": c.titulo, "tipo": c.tipo, "seccion": c.seccion,
                 "dia": c.dia, "hora": f"{c.hora_inicio} - {c.hora_fin}", "lugar": f"{c.edificio} {c.salon}"
             })
-        self.txt_export_json.delete("1.0", tk.END)
-        self.txt_export_json.insert("1.0", json.dumps(data_export, indent=4, ensure_ascii=False))
+        # Actualizar editor JSON de forma segura (si existe)
+        try:
+            if hasattr(self, 'txt_export_json') and getattr(self.txt_export_json, 'winfo_exists', lambda: False)():
+                self.txt_export_json.delete("1.0", tk.END)
+                self.txt_export_json.insert("1.0", json.dumps(data_export, indent=4, ensure_ascii=False))
+        except Exception:
+            # Si el widget no existe o ocurrió error, ignorar para evitar crash de UI
+            pass
 
         dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-        horas = list(range(8, 22))  # 8:00 a 21:00
+        # Generar lista de horas según la regla: empezar 08:00, sumar 1h30 repetidamente hasta
+        # que el siguiente cruce pase 16:10; en ese caso, el último incremento será de 1h25.
+        horas_list = []
+        from datetime import time, datetime, timedelta
+        cur = datetime.combine(datetime.today(), time(hour=8, minute=0))
+        limit = datetime.combine(datetime.today(), time(hour=16, minute=10))
+        while True:
+            horas_list.append(cur.time().strftime('%H:%M'))
+            # calcular siguiente con 1h30
+            next1 = cur + timedelta(hours=1, minutes=30)
+            if next1 > limit:
+                # aplicar incremento final de 1h25 y terminar
+                cur = cur + timedelta(hours=1, minutes=25)
+                horas_list.append(cur.time().strftime('%H:%M'))
+                break
+            cur = next1
+            # evitar bucle infinito si se pasa de 23:59
+            if cur.day != datetime.today().day:
+                break
+        horas = horas_list
 
         # Configurar grid
         self.scroll_g.grid_columnconfigure(0, minsize=70)  # Columna de horas
@@ -943,10 +1099,10 @@ class HorarioAppProfesional:
             ctk.CTkLabel(self.scroll_g, text=dia, fg_color="#1E3A8A", text_color="white",
                         width=150, height=40, corner_radius=4, font=("Inter", 12, "bold")).grid(row=0, column=i+1, padx=2, pady=2, sticky="ew")
 
-        # Filas de horas + celdas vacías
+        # Filas de horas + celdas vacías (usar cadenas de horas)
         for j, hora in enumerate(horas):
             # Etiqueta de hora
-            ctk.CTkLabel(self.scroll_g, text=f"{hora:02d}:00", width=70, height=50,
+            ctk.CTkLabel(self.scroll_g, text=f"{hora}", width=70, height=50,
                         fg_color=("gray80", "gray30"), font=("Inter", 11)).grid(row=j+1, column=0, padx=2, pady=1, sticky="nsew")
 
             # Celdas vacías de fondo
@@ -1000,12 +1156,46 @@ class HorarioAppProfesional:
                 hf = int(hf_str.split(':')[0])
                 mf = int(hf_str.split(':')[1])
 
-                # Calcular posición en el grid
-                if hi < 8 or hi >= 22: continue  # Fuera de rango
+                # Parsear horas
+                hi_str, hf_str = c.hora_inicio, c.hora_fin
+                hi = int(hi_str.split(':')[0])
+                mi = int(hi_str.split(':')[1])
+                hf = int(hf_str.split(':')[0])
+                mf = int(hf_str.split(':')[1])
 
-                row_start = (hi - 8) + 1  # +1 por la cabecera
-                duracion_minutos = (hf * 60 + mf) - (hi * 60 + mi)
-                row_span = max(1, round(duracion_minutos / 60))
+                # Convertir lista de horas (strings) a minutos desde 00:00
+                try:
+                    start_minutes = []
+                    for hh in horas:
+                        hh_h, hh_m = [int(x) for x in hh.split(':')]
+                        start_minutes.append(hh_h * 60 + hh_m)
+                except Exception:
+                    start_minutes = [h*60 for h in range(8,22)]
+
+                hi_min = hi * 60 + mi
+                hf_min = hf * 60 + mf
+
+                # Encontrar la fila (índice) donde comienza la clase: el último start <= hi_min
+                import bisect
+                idx = bisect.bisect_right(start_minutes, hi_min) - 1
+                if idx < 0:
+                    # fuera del rango por debajo
+                    continue
+
+                # Determinar intervalo en minutos para esta fila
+                if idx + 1 < len(start_minutes):
+                    interval = start_minutes[idx+1] - start_minutes[idx]
+                else:
+                    # si es la última fila, repetir el último intervalo si existe
+                    if len(start_minutes) >= 2:
+                        interval = start_minutes[-1] - start_minutes[-2]
+                    else:
+                        interval = 60
+
+                row_start = idx + 1  # +1 por la cabecera
+                duracion_minutos = hf_min - hi_min
+                # row_span basado en cuántos intervalos cubre la duración
+                row_span = max(1, round(duracion_minutos / max(1, interval)))
 
                 if c.dia in dias:
                     col = dias.index(c.dia) + 1
@@ -1041,30 +1231,41 @@ class HorarioAppProfesional:
             elif tipo_norm == 'LAB':
                 color_muestra = adjust_brightness(self.mapa_colores_actual[c.nrc], 0.8)
             ctk.CTkLabel(lf, text=tipo_norm, width=10, height=10, fg_color=color_muestra, corner_radius=5).pack(side="left", padx=10, pady=2)
-            ctk.CTkLabel(lf, text=c.titulo, font=("Inter", 11)).pack(side="left", padx=10, pady=2)
+            # Mostrar título + NRC y sala si existe
+            ley_text = f"{c.titulo} ({getattr(c,'nrc','?')})"
+            sala = (getattr(c, 'edificio', '') or '').strip() + (' ' + (getattr(c,'salon','') or '').strip() if (getattr(c,'salon','') or '').strip() else '')
+            if sala.strip():
+                ley_text += f" — {sala.strip()}"
+            ctk.CTkLabel(lf, text=ley_text, font=("Inter", 11)).pack(side="left", padx=10, pady=2)
 
     # --- PESTAÑA 4: EXPORTAR ---
     def setup_tab_export(self):
+        # La pestaña 'Exportar' ahora será exclusivamente para exportar a Excel/CSV
         tab = self.tabview.tab("4. Exportar")
         tab.grid_columnconfigure(0, weight=1); tab.grid_rowconfigure(0, weight=1)
 
-        # Solo un scrollable frame para el JSON
-        self.scroll_j = ctk.CTkScrollableFrame(tab, label_text="Exportar a JSON")
-        self.scroll_j.grid(row=0, column=0, sticky="nsew", pady=10)
+        self.export_frame = ctk.CTkScrollableFrame(tab, label_text="Exportar a Excel/CSV")
+        self.export_frame.grid(row=0, column=0, sticky="nsew", pady=10)
 
-        # Editor de texto para JSON
-        self.txt_export_json = ctk.CTkTextbox(self.scroll_j, font=("Consolas", 12), border_width=1)
-        self.txt_export_json.pack(fill="both", expand=True, padx=5, pady=5)
+        # Tabla de ramos (simple lista) - arriba
+        self.export_table = ctk.CTkFrame(self.export_frame)
+        self.export_table.pack(fill='x', padx=10, pady=(8,8))
+        ctk.CTkLabel(self.export_table, text='Ramos (vista previa) — Se exportará el horario actualmente mostrado', font=ctk.CTkFont(size=12, weight='bold')).pack(anchor='w', pady=(4,6))
 
-        # Botones de acción
+        # Contenedor para la mini-vista del horario (similar al optimizado)
+        self.export_preview = ctk.CTkFrame(self.export_frame)
+        self.export_preview.pack(fill='both', expand=True, padx=10, pady=(8,8))
+
+        # Botones de acción: Exportar CSV (Excel puede abrir CSV)
         ft = ctk.CTkFrame(tab, fg_color="transparent")
         ft.grid(row=1, column=0, sticky="ew", pady=(5,0))
-
-        ctk.CTkButton(ft, text="COPIAR A PORTAPAPELES", command=self.copiar_json, width=200, height=50).pack(side="right", padx=10)
-        ctk.CTkButton(ft, text="DESCARGAR JSON", command=self.descargar_json, width=200, height=50).pack(side="right", padx=10)
+        ctk.CTkButton(ft, text="EXPORTAR HORARIO A CSV", command=self.export_current_schedule_csv, width=240, height=50).pack(side="right", padx=10)
 
     def copiar_json(self):
         try:
+            if not hasattr(self, 'txt_export_json') or not getattr(self.txt_export_json, 'winfo_exists', lambda: False)():
+                messagebox.showwarning('Copiar', 'No hay editor de JSON disponible para copiar.')
+                return
             self.root.clipboard_clear()
             self.root.clipboard_append(self.txt_export_json.get("1.0", tk.END))
             messagebox.showinfo("Copiar a portapapeles", "El JSON ha sido copiado al portapapeles.")
@@ -1073,6 +1274,9 @@ class HorarioAppProfesional:
 
     def descargar_json(self):
         try:
+            if not hasattr(self, 'txt_export_json') or not getattr(self.txt_export_json, 'winfo_exists', lambda: False)():
+                messagebox.showwarning('Descargar JSON', 'No hay datos para descargar.')
+                return
             data = self.txt_export_json.get("1.0", tk.END).strip()
             if not data:
                 messagebox.showwarning("Descargar JSON", "No hay datos para descargar.")
@@ -1084,101 +1288,70 @@ class HorarioAppProfesional:
             if not nombre_archivo.endswith(".json"):
                 nombre_archivo += ".json"
             # Ruta completa
-            ruta_archivo = os.path.join(filedialog.askdirectory(title="Selecciona carpeta de destino"), nombre_archivo)
+            carpeta = filedialog.askdirectory(title="Selecciona carpeta de destino")
+            if not carpeta:
+                return
+            ruta_archivo = os.path.join(carpeta, nombre_archivo)
             with open(ruta_archivo, 'w', encoding='utf-8') as f:
                 f.write(data)
             messagebox.showinfo("Descargar JSON", f"Archivo guardado como: {ruta_archivo}")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo guardar el archivo: {e}")
 
+    def export_current_schedule_csv(self):
+        try:
+            if not self.mejores_horarios:
+                messagebox.showwarning('Exportar', 'No hay horario generado para exportar.')
+                return
+            idx = self.indice_horario_actual or 0
+            cls = self.mejores_horarios[idx]
+            # Construir filas: NRC, titulo, tipo, seccion, dia, hora, lugar
+            rows = []
+            for c in cls:
+                rows.append([getattr(c,'nrc',''), getattr(c,'titulo',''), getattr(c,'tipo',''), getattr(c,'seccion',''), getattr(c,'dia',''), f"{getattr(c,'hora_inicio','')}-{getattr(c,'hora_fin','')}", f"{getattr(c,'edificio','')} {getattr(c,'salon','')}".strip()])
+            # Pedir nombre de archivo
+            nombre = ctk.CTkInputDialog(text='Ingresa nombre para el archivo (sin extensión):', title='Exportar CSV').get_input()
+            if not nombre:
+                return
+            if not nombre.endswith('.csv'):
+                nombre += '.csv'
+            carpeta = filedialog.askdirectory(title='Selecciona carpeta de destino')
+            if not carpeta:
+                return
+            ruta = os.path.join(carpeta, nombre)
+            import csv
+            with open(ruta, 'w', encoding='utf-8', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['NRC','Titulo','Tipo','Seccion','Dia','Hora','Lugar'])
+                for r in rows:
+                    writer.writerow(r)
+            messagebox.showinfo('Exportar', f'Archivo exportado: {ruta}')
+        except Exception as e:
+            messagebox.showerror('Error', str(e))
+
     # --- PESTAÑA 5: GESTIÓN JSON ---
     def setup_tab_json(self):
         tab = self.tabview.tab("5. Gestión JSON")
         tab.grid_columnconfigure(0, weight=1); tab.grid_rowconfigure(0, weight=1)
 
-        # Solo un scrollable frame para el JSON
-        self.scroll_j2 = ctk.CTkScrollableFrame(tab, label_text="Cargar JSON")
-        self.scroll_j2.grid(row=0, column=0, sticky="nsew", pady=10)
+        # Area superior: JSON del horario completo
+        self.scroll_j = ctk.CTkScrollableFrame(tab, label_text="Horario completo (JSON)")
+        self.scroll_j.grid(row=0, column=0, sticky="nsew", pady=10)
+        self.txt_export_json = ctk.CTkTextbox(self.scroll_j, font=("Consolas", 12), border_width=1)
+        self.txt_export_json.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Editor de texto para JSON
-        self.txt_cargar_json = ctk.CTkTextbox(self.scroll_j2, font=("Consolas", 12), border_width=1)
-        self.txt_cargar_json.pack(fill="both", expand=True, padx=5, pady=5)
-
-        # Botones de acción
+        # Botones para el JSON completo y export general
         ft = ctk.CTkFrame(tab, fg_color="transparent")
         ft.grid(row=1, column=0, sticky="ew", pady=(5,0))
+        ctk.CTkButton(ft, text="COPIAR JSON", command=self.copiar_json, width=200, height=50).pack(side="right", padx=10)
+        ctk.CTkButton(ft, text="DESCARGAR JSON", command=self.descargar_json, width=200, height=50).pack(side="right", padx=10)
+        ctk.CTkButton(ft, text="EXPORTAR HORARIO (CSV)", command=self.export_current_schedule_csv, width=220, height=50).pack(side="right", padx=10)
 
-        ctk.CTkButton(ft, text="CARGAR JSON", command=self.cargar_json, width=200, height=50).pack(side="right", padx=10)
-        ctk.CTkButton(ft, text="LIMPIAR", command=self.limpiar_json, width=200, height=50).pack(side="right", padx=10)
-
-    def limpiar_json(self):
-        if messagebox.askyesno("Limpiar", "¿Estás seguro de que quieres limpiar el contenido?"):
-            self.txt_cargar_json.delete("1.0", tk.END)
-
-    def cargar_json(self):
-        try:
-            data = self.txt_cargar_json.get("1.0", tk.END).strip()
-            if not data:
-                messagebox.showwarning("Cargar JSON", "No hay datos para cargar.")
-                return
-            # Intentar cargar como JSON
-            try:
-                json_data = json.loads(data)
-                messagebox.showinfo("Cargar JSON", "Datos cargados correctamente.")
-            except json.JSONDecodeError:
-                messagebox.showerror("Cargar JSON", "Error de formato JSON. Verifica el contenido.")
-                return
-            # Procesar ramos
-            ramos = defaultdict(list)
-            for item in json_data:
-                titulo = item.get("curso")
-                secciones = item.get("secciones", [])
-                for s in secciones:
-                    nrc = s.get("nrc")
-                    tipo = s.get("tipo")
-                    seccion = s.get("seccion")
-                    dia = s.get("dia")
-                    hora = s.get("hora")
-                    lugar = s.get("lugar")
-                    if nrc and dia and hora:
-                        ramos[titulo].append({
-                            "nrc": nrc,
-                            "tipo": tipo,
-                            "seccion": seccion,
-                            "dia": dia,
-                            "hora": hora,
-                            "lugar": lugar
-                        })
-            # Guardar en horarios_crudos
-            self.horarios_crudos = []
-            for hrs in ramos.values():
-                self.horarios_crudos.extend(hrs)
-            messagebox.showinfo("Cargar JSON", f"Se cargaron {len(self.horarios_crudos)} ramos.")
-            self.tabview.set("2. Datos Procesados")
-            self.cargar_config(ramos)
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo cargar el JSON: {e}")
-
-    def abrir_invitado(self):
-        """Modo invitado: ocultar login y mostrar ventana principal sin sesión."""
-        try:
-            self.auth.current_user = None
-            try: self.lbl_user_info.configure(text="Invitado")
-            except: pass
-            try:
-                self.root.deiconify()
-                self.root.attributes("-zoomed", True)
-            except Exception:
-                pass
-            if hasattr(self, 'login_win_ref') and self.login_win_ref:
-                try: self.login_win_ref.destroy()
-                except: pass
-            self._update_license_ui()
-        except Exception:
-            pass
-
-    def actualizar_json_tab(self):
-        """Actualizar la pestaña de gestión JSON con `ramos_json_store`."""
+        # Area inferior: JSONs separados / ramos
+        self.scroll_j_ramos = ctk.CTkScrollableFrame(tab, label_text="Ramos JSON separados")
+        self.scroll_j_ramos.grid(row=2, column=0, sticky='nsew', pady=(8,8))
+        # mantener compatibilidad con actualizar_json_tab que usa self.scroll_j
+        # actualizar_json_tab mostrará los JSONs separados dentro de scroll_j_ramos
         try:
             # Si no existe scroll_j, crear uno básico
             if not hasattr(self, 'scroll_j'):
@@ -1202,6 +1375,41 @@ class HorarioAppProfesional:
                 tx = ctk.CTkTextbox(f, height=120); tx.insert("1.0", d.get('json_str', '')); tx.pack(fill="x", padx=10, pady=(0,10))
         except Exception:
             pass
+
+    def actualizar_json_tab(self):
+        """Actualizar la pestaña de gestión JSON con `ramos_json_store`."""
+        try:
+            # Llenar el editor global con el JSON del horario actual (si existe)
+            try:
+                if hasattr(self, 'txt_export_json') and getattr(self.txt_export_json, 'winfo_exists', lambda: False)():
+                    # Construir JSON global a partir de ramos_json_store si no está vacío
+                    if self.ramos_json_store:
+                        # construir lista ordenada
+                        data_export = {k: v.get('json_str','') for k,v in self.ramos_json_store.items()}
+                        self.txt_export_json.delete('1.0', tk.END)
+                        self.txt_export_json.insert('1.0', json.dumps({k: json.loads(v.get('json_str','{}')) if v.get('json_str') else {} for k,v in self.ramos_json_store.items()}, indent=4, ensure_ascii=False))
+            except Exception:
+                pass
+
+            # Ramas JSON separados (usar scroll_j_ramos)
+            if not hasattr(self, 'scroll_j_ramos'):
+                return
+            for w in list(self.scroll_j_ramos.winfo_children()):
+                w.destroy()
+            for t, d in self.ramos_json_store.items():
+                f = ctk.CTkFrame(self.scroll_j_ramos); f.pack(fill="x", pady=5, padx=10)
+                header = ctk.CTkFrame(f, fg_color="transparent")
+                header.pack(fill="x", padx=10, pady=5)
+                ctk.CTkLabel(header, text=t, font=("Inter", 12, "bold")).pack(side="left")
+                def _copy(txt=d.get('json_str', '')):
+                    try:
+                        self.root.clipboard_clear(); self.root.clipboard_append(txt); messagebox.showinfo("Copiado", f"JSON de {t} copiado al portapapeles.")
+                    except Exception:
+                        pass
+                ctk.CTkButton(header, text="📋 Copiar", width=80, height=24, command=_copy).pack(side="right")
+                tx = ctk.CTkTextbox(f, height=120); tx.insert("1.0", d.get('json_str', '')); tx.pack(fill="x", padx=10, pady=(0,10))
+        except Exception:
+             pass
 
 def main():
     _write_log('main start')
