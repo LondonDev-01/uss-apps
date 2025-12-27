@@ -72,3 +72,8 @@ Diseñado para ser distribuido como un producto final. Incluye guías para:
 
 ---
 *Desarrollado para optimizar la vida académica de los Sebastianos.*
+
+---
+**Nota (2025-12-26):** La herramienta de administración local (scripts y panel `/admin`) fue eliminada; las operaciones administrativas deben realizarse desde la consola de Neon o mediante consultas SQL directas. Ver `CHANGES.md` para más detalles.
+
+Seguridad: el token de migración de licencias se genera automáticamente y se almacena en la tabla `usuarios` como un hash (`migrate_pass_hash`) y (para conveniencia administrativa) como `migrate_pass_token`. Este token **no** se muestra en la UI a usuarios finales; lo verás únicamente en la consola Neon (o puedes regenerarlo usando la función `regenerate_migrate_token`).
