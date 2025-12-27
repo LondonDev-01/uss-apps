@@ -8,9 +8,32 @@
     - Si tienes un ejecutable compilado, puedes usar `dist/UniHorarioUSS.exe`.
 2.  **Crea tu cuenta:** Si es tu primera vez, ve a la pestaña **"Crea una Cuenta"**, elige un Usuario y Contraseña, y dale a **Registrar**.
 3.  **Activa tu membresía:** 
-    *   Al intentar entrar, verás un mensaje de cuenta no activada.
-    *   Envía tu **Nombre de Usuario** y el comprobante de pago de $1.000 al administrador.
-    *   Una vez activada, podrás entrar y usar el programa por **30 días**.
+    *   Al registrarte, tu cuenta quedará como "pendiente de activación" hasta que el administrador la active.
+    *   Para activar la cuenta, el admin debe marcar `is_active = TRUE` en la base de datos o usar la herramienta administrativa provista.
+    *   Una vez activada, tu acceso estará permitido por **30 días** (fecha de expiración en el perfil).
+
+---
+## Registro, activación y migración (usuario y admin)
+
+1) Flujo para el usuario (qué esperar):
+   - Al registrarte verás un mensaje: "Registro exitoso. Tu cuenta está pendiente de activación por admin.".
+   - Si intentas iniciar sesión antes de la activación verás un aviso: "Cuenta aún sin activar o desactivada. Contacta al administrador." y la app no permitirá procesar datos.
+   - Si tu cuenta está activa pero ya está siendo usada en otros equipos, la app te pedirá un `migrate_pass_hash` o solicitará al admin liberar la sesión.
+
+2) Flujo para el administrador (cómo activar y migrar):
+   - Activar cuenta: ejecutar en la DB: `UPDATE usuarios SET is_active = TRUE WHERE username = 'usuario';`
+   - Generar/renovar `migrate_pass_hash` para transferencias:
+       - El admin puede ejecutar la función `regenerate_migrate_hash(username)` desde la consola administrativa; esto almacenará el hash en la DB.
+       - Entrega el HASH (no la contraseña) al usuario para que lo pegue en la app cuando ésta lo solicite para migrar o transferir licencia.
+
+3) Migración desde la app (usuario):
+   - Si aparece el mensaje "Cuenta activa en otro dispositivo", pega el `migrate_pass_hash` que te dio el admin en el diálogo que aparecerá.
+   - Si el hash es válido, la app intentará migrar la licencia a este equipo y guardar la sesión.
+
+4) Contacto y soporte:
+   - Si tienes problemas con activación o migración, comparte con el admin tu `username` y la fecha aproximada del registro. El admin puede revisar `usuarios` y `active_sessions` en la DB para diagnosticar.
+
+---
 
 ## 2. Cómo Generar tu Horario Perfecto (Paso a Paso)
 
