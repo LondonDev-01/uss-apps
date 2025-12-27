@@ -250,15 +250,36 @@ class HorarioAppProfesional:
                 try:
                     register_fn = getattr(self.auth, 'register', None)
                     if callable(register_fn):
-                        ok, msg = register_fn(user, p1, phone)
-                        if ok:
-                            messagebox.showinfo('Registro', 'Cuenta creada correctamente. Puedes iniciar sesión.')
-                            try: win.destroy()
-                            except: pass
-                            return
-                        else:
-                            messagebox.showerror('Registro', f'No se pudo crear la cuenta: {msg}')
-                            return
+                        # Ejecutar el registro en background para no bloquear la UI
+                        self.show_loader('Creando cuenta...')
+                        def _reg_task():
+                            try:
+                                ok, msg = register_fn(user, p1, phone)
+                            except Exception as e:
+                                ok, msg = False, str(e)
+                            # Volver al hilo principal para actualizar UI
+                            def _on_done():
+                                try: self.hide_loader()
+                                except: pass
+                                if ok:
+                                    try:
+                                        messagebox.showinfo('Registro', msg)
+                                    except Exception:
+                                        pass
+                                    try: win.destroy()
+                                    except Exception:
+                                        pass
+                                else:
+                                    try:
+                                        messagebox.showerror('Registro', f'No se pudo crear la cuenta: {msg}')
+                                    except Exception:
+                                        pass
+                            try:
+                                self.root.after(0, _on_done)
+                            except Exception:
+                                _on_done()
+                        threading.Thread(target=_reg_task, daemon=True).start()
+                        return
                     else:
                         # No hay endpoint de registro en AuthManager
                         messagebox.showinfo('Registro', 'Registro no disponible en este servidor. Contacta al administrador.')
@@ -703,6 +724,17 @@ class HorarioAppProfesional:
                             messagebox.showerror("Error", f"No se pudo migrar: {msg2}")
                             return
                     return
+        except Exception:
+            pass
+
+        # Si la falla indica que la cuenta no está activada, mostrar aviso claro
+        try:
+            if isinstance(msg, str) and ("no activ" in msg.lower() or "pendiente de activ" in msg.lower() or "no activada" in msg.lower()):
+                try:
+                    messagebox.showwarning('Cuenta no activada', 'Tu cuenta aún no ha sido activada por el administrador. Espera a que el admin la active o contacta al administrador para asistencia.')
+                except Exception:
+                    pass
+                return
         except Exception:
             pass
 
