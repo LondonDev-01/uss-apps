@@ -284,7 +284,8 @@ class HorarioAppProfesional:
                     else:
                         # No logged in; ensure UI shows invitado
                         self.lbl_user_info.configure(text="Invitado")
-             except: pass
+            except:
+                pass
         # ocultar loader inicial (si fue mostrado)
         try:
             self.hide_loader()
@@ -524,7 +525,48 @@ class HorarioAppProfesional:
 
     # --- CARGA Y PROCESAMIENTO DE DATOS ---
     def setup_tab_entrada(self):
-        pass  # Implementar configuración de tab de entrada
+        """Configura la pestaña 1 con los 3 inputs principales tal como en la versión web:
+        - Ramos principales
+        - Ramos para adelantar
+        - Electivos (si no lo tienes claro, elegimos uno al azar entre los que pongas)
+        """
+        tab = self.tabview.tab("1. Datos del Portal")
+        # Layout básico: 3 columnas para los 3 campos
+        tab.grid_columnconfigure((0,1,2), weight=1)
+        tab.grid_rowconfigure(2, weight=1)
+
+        # Preferencias (mantener simples)
+        pf = ctk.CTkFrame(tab)
+        pf.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 12), padx=8)
+        ctk.CTkCheckBox(pf, text="Priorizar NO Entrar Temprano", ).pack(side="left", padx=8)
+        ctk.CTkCheckBox(pf, text="Priorizar NO Salir Tarde", ).pack(side="left", padx=8)
+
+        # Mensaje guía general
+        ctk.CTkLabel(tab, text="Paso 1: Ingresa tus ramos por categoría (pega cada lista en su columna)", font=ctk.CTkFont(size=12, weight="bold")).grid(row=1, column=0, columnspan=3, sticky="w", padx=10, pady=(6,6))
+
+        # Ramos principales
+        lbl0 = ctk.CTkLabel(tab, text="📘 Ramos principales", font=ctk.CTkFont(size=12, weight="bold"))
+        lbl0.grid(row=2, column=0, sticky="nw", padx=10, pady=(4,2))
+        self.t0 = ctk.CTkTextbox(tab, height=220, font=("Consolas", 12))
+        self.t0.grid(row=3, column=0, sticky="nsew", padx=10, pady=(0,10))
+
+        # Ramos para adelantar
+        lbl1 = ctk.CTkLabel(tab, text="☀️ Ramos para adelantar", font=ctk.CTkFont(size=12, weight="bold"))
+        lbl1.grid(row=2, column=1, sticky="nw", padx=10, pady=(4,2))
+        self.t1 = ctk.CTkTextbox(tab, height=220, font=("Consolas", 12))
+        self.t1.grid(row=3, column=1, sticky="nsew", padx=10, pady=(0,10))
+
+        # Electivos
+        lbl2 = ctk.CTkLabel(tab, text="🍀 Electivos (si no lo tienes claro, elegimos uno al azar entre los que pongas)", font=ctk.CTkFont(size=12, weight="bold"))
+        lbl2.grid(row=2, column=2, sticky="nw", padx=10, pady=(4,2))
+        self.t2 = ctk.CTkTextbox(tab, height=220, font=("Consolas", 12))
+        self.t2.grid(row=3, column=2, sticky="nsew", padx=10, pady=(0,10))
+
+        # Botones de acción
+        ft = ctk.CTkFrame(tab, fg_color="transparent")
+        ft.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(6, 12), padx=10)
+        ctk.CTkButton(ft, text="Limpiar Texto", fg_color="#64748B", hover_color="#475569", command=self.limpiar_inputs, width=160).pack(side="left")
+        ctk.CTkButton(ft, text="PROCESAR TODO", width=220, height=40, command=self.procesar_todo, fg_color="#2563EB").pack(side="right")
 
     def setup_tab_config(self):
         pass  # Implementar configuración de tab de configuración
