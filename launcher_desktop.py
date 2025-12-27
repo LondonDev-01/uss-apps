@@ -548,6 +548,8 @@ class HorarioAppProfesional:
                 mig_hash = ctk.CTkInputDialog(text="Pega aquí el migrate_pass_hash que te dio el admin:", title="migrate_pass_hash").get_input()
                 if not mig_hash:
                     return
+                # inicializar para seguridad y análisis estático
+                valid = False
                 try:
                     self.show_loader("Validando migrate_pass_hash...")
                     valid = self.auth.validate_migrate_hash(u, mig_hash.strip())
@@ -589,7 +591,69 @@ class HorarioAppProfesional:
         self.login_win_ref.protocol("WM_DELETE_WINDOW", lambda: self.root.destroy())
 
     def open_reg(self, parent):
-        pass  # Implementar lógica de registro si es necesario
+        """Abre la ventana de registro y registra el usuario usando AuthManager.register."""
+        reg_win = ctk.CTkToplevel(parent)
+        reg_win.title("Registro")
+        reg_win.geometry("460x520")
+        reg_win.resizable(False, False)
+        reg_win.attributes("-topmost", True)
+
+        bg = ctk.CTkFrame(reg_win, fg_color=("#F3F4F6", "#111827"))
+        bg.pack(fill="both", expand=True)
+
+        card = ctk.CTkFrame(bg, fg_color=("#FFFFFF", "#1F2937"), corner_radius=14, width=420, height=480)
+        card.place(relx=0.5, rely=0.5, anchor="center")
+        card.pack_propagate(False)
+
+        ctk.CTkLabel(card, text="CREAR CUENTA", font=("Inter", 20, "bold")).pack(pady=(18,6))
+        ctk.CTkLabel(card, text="Introduce los datos. El admin activará tu cuenta.", text_color="gray").pack(pady=(0,8))
+
+        ru = ctk.CTkEntry(card, placeholder_text="Nombre de usuario", height=40, corner_radius=8)
+        ru.pack(fill="x", padx=36, pady=(8,6))
+
+        rt = ctk.CTkEntry(card, placeholder_text="WhatsApp (opcional)", height=40, corner_radius=8)
+        rt.pack(fill="x", padx=36, pady=(0,6))
+
+        rp1 = self.create_password_entry(card, "Nueva Contraseña", height=40, corner_radius=8)
+        rp2 = self.create_password_entry(card, "Confirmar Contraseña", height=40, corner_radius=8)
+
+        def do_reg():
+            u = ru.get().strip()
+            t = rt.get().strip()
+            p1 = rp1.get()
+            p2 = rp2.get()
+            if not u or not p1:
+                messagebox.showerror("Error", "Usuario y contraseña son obligatorios.", parent=reg_win)
+                return
+            if p1 != p2:
+                messagebox.showerror("Error", "Las contraseñas no coinciden.", parent=reg_win)
+                return
+            ok, msg = False, ""
+            try:
+                self.show_loader("Registrando...")
+                ok, msg = self.auth.register(u, p1, t)
+            except Exception as e:
+                ok, msg = False, f"Error al registrar: {e}"
+            finally:
+                try: self.hide_loader()
+                except: pass
+
+            if ok:
+                # Explicar correctamente el propósito del migrate_pass_hash (migración entre dispositivos)
+                fullmsg = (
+                    msg + "\n\nTu cuenta fue creada correctamente. "
+                    "Podrás usarla en este equipo (será el primer dispositivo registrado). "
+                    "Si deseas usar la misma cuenta en otro equipo, solicita al admin el migrate_pass_hash; "
+                    "esa clave se genera automáticamente cuando se crea la cuenta y sólo la verá el admin. "
+                    "El migrate_pass_hash sirve exclusivamente para 'migrar'/autorizar la cuenta en dispositivos adicionales, no para activar la cuenta."
+                )
+                messagebox.showinfo("Éxito", fullmsg, parent=reg_win)
+                reg_win.destroy()
+            else:
+                messagebox.showerror("Error", msg, parent=reg_win)
+
+        ctk.CTkButton(card, text="REGISTRARSE", command=do_reg, height=44, fg_color="#10B981").pack(pady=14, padx=36, fill="x")
+        ctk.CTkButton(card, text="Volver", fg_color="transparent", text_color="gray", command=reg_win.destroy).pack(pady=(6,8))
 
     # --- CARGA Y PROCESAMIENTO DE DATOS ---
     def setup_tab_entrada(self):
