@@ -7,7 +7,7 @@ export default function Auth(){
       <p>Implementa aquí los componentes de sign-in / sign-up usando Neon Auth.</p>
       <p>Ejemplo: usar hooks/contexts proporcionados por `@neondatabase/neon-js`.</p>
       <hr />
-      <p>Si eres el admin, ve a <a href="/admin">/admin</a> para generar claves temporales.</p>
+      <p>La gestión local de claves temporales fue eliminada del proyecto. Usa la consola de Neon o acceso directo a la base de datos para estas operaciones.</p>
     </div>
   )
 }

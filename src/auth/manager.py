@@ -1,9 +1,7 @@
 import psycopg2
-from psycopg2 import extras
 import hashlib
-import os
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Tuple
+from typing import Optional, Tuple
 
 class AuthManager:
     """
@@ -22,46 +20,31 @@ class AuthManager:
         return psycopg2.connect(self.connection_string)
 
     def _init_db(self):
-        """Inicializa la tabla de usuarios y asegura la migración del esquema"""
+        """Inicializa la tabla de usuarios y asegura la migración del esquema
+        La tabla `usuarios` contiene sólo las columnas requeridas por el cliente.
+        """
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-            # Crear tabla si no existe
+            # Crear tabla `usuarios` con sólo las columnas solicitadas
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS usuarios (
                     id SERIAL PRIMARY KEY,
                     username TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
                     is_active BOOLEAN DEFAULT FALSE,
-                    is_admin BOOLEAN DEFAULT FALSE,
                     expires_at TIMESTAMP,
                     telefono TEXT,
                     migrate_pass_hash TEXT
                 )
             ''')
-            # Migración: Asegurarse de que las columnas existen
-            cursor.execute('''
-                ALTER TABLE usuarios 
-                ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP,
-                ADD COLUMN IF NOT EXISTS telefono TEXT
-                , ADD COLUMN IF NOT EXISTS migrate_pass_hash TEXT
-                , ADD COLUMN IF NOT EXISTS is_admin BOOLEAN
-            ''')
-            # Tabla para sesiones activas (una por usuario)
+            # Tabla para sesiones activas (una por usuario/device)
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS active_sessions (
                     username TEXT NOT NULL,
                     device_id TEXT NOT NULL,
                     last_seen TIMESTAMP,
                     PRIMARY KEY (username, device_id)
-                )
-            ''')
-            # Tabla para claves de migración (validez por tiempo)
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS migration_keys (
-                    key TEXT PRIMARY KEY,
-                    username TEXT,
-                    valid_until TIMESTAMP
                 )
             ''')
             conn.commit()
@@ -74,93 +57,58 @@ class AuthManager:
         """Genera un hash SHA-256 de la contraseña"""
         return hashlib.sha256(password.encode()).hexdigest()
 
-    def set_migrate_password(self, username: str, password: str) -> Tuple[bool, str]:
-        """Configura una contraseña de migración (almacenada como hash) para un usuario."""
-        if not username or not password:
-            return False, "Usuario y contraseña requeridos"
+    def set_migrate_hash(self, username: str, migrate_hash: str) -> Tuple[bool, str]:
+        """Permite que el admin establezca directamente el migrate_pass_hash para un usuario."""
+        if not username or not migrate_hash:
+            return False, "Usuario y hash requeridos"
         try:
             conn = self._get_connection(); cur = conn.cursor()
-            cur.execute("UPDATE usuarios SET migrate_pass_hash = %s WHERE username = %s", (self._hash_password(password), username))
+            cur.execute("UPDATE usuarios SET migrate_pass_hash = %s WHERE username = %s",
+                        (migrate_hash, username))
             conn.commit(); cur.close(); conn.close()
-            return True, "Contraseña de migración establecida"
+            return True, "Hash de migración establecido"
         except Exception as e:
             return False, f"Error: {e}"
 
-    def validate_migrate_password(self, username: str, password: str) -> bool:
-        """Valida la contraseña de migración para el usuario."""
+    def validate_migrate_hash(self, username: str, migrate_hash: str) -> bool:
+        """Valida que el hash de migración proporcionado coincida con el almacenado."""
         try:
             conn = self._get_connection(); cur = conn.cursor()
             cur.execute("SELECT migrate_pass_hash FROM usuarios WHERE username = %s", (username,))
             row = cur.fetchone(); cur.close(); conn.close()
-            if not row or not row[0]:
+            if not row:
                 return False
-            return row[0] == self._hash_password(password)
+            db_hash = row[0]
+            if not db_hash:
+                return False
+            # La comparación es directa: el admin compartirá este HASH con el cliente.
+            return db_hash == migrate_hash
         except Exception:
             return False
 
-    # --- Migration keys management ---
-    def generate_migration_key(self, username: Optional[str] = None, days_valid: int = 5) -> str:
-        """Genera y guarda una clave de migración válida por `days_valid` días. Retorna la clave."""
-        import secrets
-        key = secrets.token_hex(32)
-        valid_until = datetime.now() + timedelta(days=days_valid)
+    def regenerate_migrate_hash(self, username: str) -> Optional[str]:
+        """Genera un nuevo token, almacena su hash en migrate_pass_hash y retorna el HASH
+        (no se almacena texto plano en la base de datos; el admin recibirá el hash que debe
+        comunicar al cliente).
+        """
         try:
+            import secrets
+            token = secrets.token_urlsafe(12)
+            token_hash = self._hash_password(token)
             conn = self._get_connection(); cur = conn.cursor()
-            cur.execute("INSERT INTO migration_keys (key, username, valid_until) VALUES (%s, %s, %s)", (key, username, valid_until))
+            cur.execute("UPDATE usuarios SET migrate_pass_hash = %s WHERE username = %s",
+                        (token_hash, username))
             conn.commit(); cur.close(); conn.close()
-            return key
+            # Retornar el HASH (el admin lo copiará y se lo dará al cliente)
+            return token_hash
         except Exception:
-            # En caso de fallo, no propagar excepción para no romper el flujo de registro;
-            # retornar None para indicar que no se creó la clave.
-            try:
-                cur.close(); conn.close()
-            except Exception:
-                pass
             return None
 
-    def list_migration_keys(self, username: Optional[str] = None) -> list:
-        """Retorna una lista de (key, valid_until) para el username proporcionado (o todas si username es None)."""
-        try:
-            conn = self._get_connection(); cur = conn.cursor()
-            if username:
-                cur.execute("SELECT key, valid_until FROM migration_keys WHERE username = %s", (username,))
-            else:
-                cur.execute("SELECT key, username, valid_until FROM migration_keys ORDER BY valid_until DESC")
-            rows = cur.fetchall()
-            cur.close(); conn.close()
-            return rows
-        except Exception:
-            return []
-
-    # NOTE: generation/setting of user-facing migrate passwords is admin-only.
-    # The methods `set_migrate_password` and `validate_migrate_password` remain for admin use.
-    # Do NOT auto-generate or display migrate passwords to end users.
-
-    def validate_migration_key(self, key: str, username: Optional[str] = None) -> bool:
-        """Valida que la clave exista, opcionalmente para un username, y no haya expirado."""
-        try:
-            conn = self._get_connection(); cur = conn.cursor()
-            if username:
-                cur.execute("SELECT valid_until FROM migration_keys WHERE key = %s AND (username = %s OR username IS NULL)", (key, username))
-            else:
-                cur.execute("SELECT valid_until FROM migration_keys WHERE key = %s", (key,))
-            row = cur.fetchone(); cur.close(); conn.close()
-            if not row: return False
-            valid_until = row[0]
-            return valid_until and valid_until >= datetime.now()
-        except Exception:
-            return False
-
-    def delete_migration_key(self, key: str):
-        try:
-            conn = self._get_connection(); cur = conn.cursor()
-            cur.execute("DELETE FROM migration_keys WHERE key = %s", (key,))
-            conn.commit(); cur.close(); conn.close()
-        except Exception:
-            pass
-
     def register(self, username: str, password: str, telefono: Optional[str] = None) -> Tuple[bool, str]:
-        """Registra un nuevo usuario con expiración de 30 días (pero inicia como inactivo)"""
+        """Registra un nuevo usuario con expiración de 30 días (pero inicia como inactivo).
+        Nota: NO generamos aquí el migrate_pass_hash automáticamente; el admin lo debe
+        establecer desde la consola (o usando regenerate_migrate_hash).
+        """
         if not username or not password:
             return False, "Usuario y contraseña son requeridos."
         
@@ -175,65 +123,47 @@ class AuthManager:
                 (username, self._hash_password(password), False, fecha_expiracion, telefono)
             )
             conn.commit()
-            cursor.close()
-            conn.close()
-
-            # Generar automáticamente una clave de migración en BD (no se muestra al usuario)
-            try:
-                # Generar con validez por defecto de 365 días
-                self.generate_migration_key(username=username, days_valid=365)
-            except Exception:
-                # No bloquear el registro por fallo en generación de clave
-                pass
-
-            return True, "Registro exitoso. Tu cuenta está pendiente de activación por el admin."
+            cursor.close(); conn.close()
+            return True, "Registro exitoso. Tu cuenta está pendiente de activación por admin."
         except psycopg2.errors.UniqueViolation:
             return False, "El nombre de usuario ya existe."
         except Exception as e:
             return False, f"Error al registrar: {str(e)}"
 
-    def create_or_promote_admin(self, username: str, password: str) -> Tuple[bool, str]:
-        """Crea o promueve un usuario a admin. Activa la cuenta y setea la contraseña.
-
-        Esta operación debe ejecutarse por el admin local (no desde clientes).
+    def apply_license(self, username: str, migrate_hash: str) -> Tuple[bool, str]:
+        """Permite al usuario activar su cuenta proporcionando el `migrate_pass_hash` que el admin
+        le entregó (si coincide con lo almacenado, activamos la cuenta).
         """
-        if not username or not password:
-            return False, "Usuario y contraseña requeridos."
+        if not username or not migrate_hash:
+            return False, "Usuario y hash de migración requeridos."
         try:
             conn = self._get_connection(); cur = conn.cursor()
-            cur.execute("SELECT id FROM usuarios WHERE username = %s", (username,))
+            cur.execute("SELECT migrate_pass_hash FROM usuarios WHERE username = %s", (username,))
             row = cur.fetchone()
-            if row:
-                cur.execute("UPDATE usuarios SET password_hash = %s, is_active = TRUE, is_admin = TRUE WHERE username = %s", (self._hash_password(password), username))
-            else:
-                expires = datetime.now() + timedelta(days=365)
-                cur.execute("INSERT INTO usuarios (username, password_hash, is_active, is_admin, expires_at) VALUES (%s, %s, TRUE, TRUE, %s)", (username, self._hash_password(password), expires))
-            conn.commit(); cur.close(); conn.close()
-            return True, "Admin creado/actualizado correctamente."
-        except Exception as e:
-            return False, f"Error creando admin: {e}"
-
-    def validate_admin_credentials(self, username: str, password: str) -> bool:
-        """Valida que las credenciales correspondan a un admin activo."""
-        try:
-            conn = self._get_connection(); cur = conn.cursor()
-            cur.execute("SELECT password_hash, is_admin, is_active FROM usuarios WHERE username = %s", (username,))
-            row = cur.fetchone(); cur.close(); conn.close()
             if not row:
-                return False
-            db_hash, is_admin, is_active = row
-            if not is_admin or not is_active:
-                return False
-            return db_hash == self._hash_password(password)
-        except Exception:
-            return False
+                cur.close(); conn.close();
+                return False, "Usuario no encontrado."
+            stored_hash = row[0]
+            if not stored_hash:
+                cur.close(); conn.close();
+                return False, "No hay hash de migración establecido para este usuario. Contacta al admin."
+            if stored_hash != migrate_hash:
+                cur.close(); conn.close();
+                return False, "Hash de migración inválido."
+            # Coincide: activar la cuenta
+            cur.execute("UPDATE usuarios SET is_active = TRUE WHERE username = %s", (username,))
+            conn.commit(); cur.close(); conn.close()
+            return True, "Cuenta activada correctamente. Ahora puedes usar la licencia en este equipo."
+        except Exception as e:
+            return False, f"Error al aplicar licencia: {e}"
 
-    def login(self, username: str, password: str, device_id: Optional[str] = None, transfer: bool = False) -> Tuple[bool, str]:
+    def login(self, username: str, password: str, device_id: Optional[str] = None, transfer: bool = False, transfer_password: Optional[str] = None) -> Tuple[bool, str]:
         """Valida credenciales remotas, estado activo, expiración y limita sesión por dispositivo.
 
-        Parámetros:
+        Parmetros:
         - device_id: identificador del dispositivo que intenta iniciar sesión.
-        - transfer: si True, forza la transferencia de la sesión activa a este device_id.
+        - transfer: si True, fuerza la transferencia de la sesión activa a este device_id.
+        - transfer_password: en este diseño, se espera que sea el migrate_pass_hash (no texto plano).
         """
         try:
             conn = self._get_connection()
@@ -257,16 +187,15 @@ class AuthManager:
                 cursor.close(); conn.close()
                 # Mensaje claro: la cuenta no tiene licencia activa
                 return False, (f"Cuenta '{username}' no activada. "
-                                f"Migra o activa tu licencia contactando al desarrollador (onsole.neon.tech).")
+                                f"Solicita al admin el migrate_pass_hash para activar la cuenta.")
 
-            # Verificar expiración (si expires_at es menor a la fecha actual)
+            # Verificar expiración
             if expires_at and expires_at < datetime.now():
                 cursor.close(); conn.close()
                 return False, f"Tu membresía expiró el {expires_at.strftime('%d/%m/%Y')}. Contacta al admin para renovar."
 
-            # Si se pasa device_id, gestionar la tabla de sesiones activas
+            # Gestión de sesiones activas por device
             if device_id:
-                # Revisar sesiones activas existentes
                 cursor.execute("SELECT device_id, last_seen FROM active_sessions WHERE username = %s ORDER BY last_seen ASC", (username,))
                 rows = cursor.fetchall()
                 existing_device_ids = [r[0] for r in rows]
@@ -275,17 +204,24 @@ class AuthManager:
                     cursor.execute("UPDATE active_sessions SET last_seen = %s WHERE username = %s AND device_id = %s", (datetime.now(), username, device_id))
                 else:
                     if len(existing_device_ids) < 2:
-                        cursor.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
+                        cursor.execute(
+                            "INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)",
+                            (username, device_id, datetime.now())
+                        )
                     else:
                         # Ya hay 2 dispositivos activos
                         if transfer:
-                            # Reemplazar la sesión más antigua
-                            oldest = existing_device_ids[0]
-                            cursor.execute("DELETE FROM active_sessions WHERE username = %s AND device_id = %s", (username, oldest))
-                            cursor.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
+                            # Si se pasa transfer_password (se espera migrate_hash) y es válido, reemplazar la sesión más antigua
+                            if transfer_password and self.validate_migrate_hash(username, transfer_password):
+                                oldest = existing_device_ids[0]
+                                cursor.execute("DELETE FROM active_sessions WHERE username = %s AND device_id = %s", (username, oldest))
+                                cursor.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
+                            else:
+                                cursor.close(); conn.close()
+                                return False, "Cuenta activa en 2 dispositivos. Para agregar este equipo, solicita el migrate_pass_hash al admin."
                         else:
                             cursor.close(); conn.close()
-                            return False, "Cuenta activa en 2 dispositivos. Para agregar este equipo, solicita al admin que genere una CLAVE TEMPORAL para migración."
+                            return False, "Cuenta activa en 2 dispositivos. Para agregar este equipo, proporciona el migrate_pass_hash que el admin te dará."
                 conn.commit()
 
             cursor.close()
@@ -319,12 +255,7 @@ class AuthManager:
         self.current_user = None
 
     def has_active_license(self, device_id: Optional[str] = None) -> bool:
-        """Verificación rápida de seguridad.
-
-        Si se pasa `device_id`, retorna True solo si la licencia está activa y la sesión
-        activa corresponde a ese `device_id`.
-        Si no se pasa, retorna True si la cuenta está activa y existe alguna sesión activa.
-        """
+        """Verificación rápida de seguridad."""
         try:
             if not self.current_user:
                 return False
@@ -337,19 +268,16 @@ class AuthManager:
             if not is_active:
                 cur.close(); conn.close(); return False
 
-            # Si nos piden comprobar un device concreto, delegar a is_license_active_on_device
             if device_id:
                 cur.close(); conn.close()
                 return self.is_license_active_on_device(self.current_user, device_id)
 
-            # Sin device_id: basta con que exista una sesión activa para el usuario
             cur.execute("SELECT device_id FROM active_sessions WHERE username = %s", (self.current_user,))
             row2 = cur.fetchone(); cur.close(); conn.close()
             if not row2:
                 return False
             return True
         except Exception:
-            # Fallback a estado local
             return self.is_authenticated
 
     def is_license_active_on_device(self, username: str, device_id: str) -> bool:
@@ -389,22 +317,19 @@ class AuthManager:
     def migrate_license(self, username: str, device_id: str) -> Tuple[bool, str]:
         """Forza la migración de la licencia para el usuario al device_id indicado.
 
-        Nota: la validación externa de la 'clave de migración' se debe hacer en el cliente
-        (por ejemplo, comparando con un hash proporcionado por el desarrollador).
+        (mantener por compatibilidad, internamente puede usarse validate_migrate_hash)
         """
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s) "
-                "ON CONFLICT (username) DO UPDATE SET device_id = EXCLUDED.device_id, last_seen = EXCLUDED.last_seen",
-                (username, device_id, datetime.now())
-            )
-            conn.commit()
-            cursor.close(); conn.close()
-            self.is_authenticated = True
-            self.current_user = username
-            return True, "Licencia migrada correctamente."
+            # simplemente reemplazar la sesión más antigua si existe
+            conn = self._get_connection(); cur = conn.cursor()
+            cur.execute("SELECT device_id FROM active_sessions WHERE username = %s ORDER BY last_seen ASC", (username,))
+            rows = cur.fetchall()
+            existing_device_ids = [r[0] for r in rows]
+            if existing_device_ids:
+                oldest = existing_device_ids[0]
+                cur.execute("DELETE FROM active_sessions WHERE username = %s AND device_id = %s", (username, oldest))
+            cur.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
+            conn.commit(); cur.close(); conn.close()
+            return True, "Migración forzada realizada"
         except Exception as e:
-            return False, f"Error migrando licencia: {e}"
-
+            return False, f"Error migrando: {e}"

@@ -1,26 +1,7 @@
-name: Create admin user
+name: create-admin (REMOVED)
 
-on:
-  workflow_dispatch: {}
-  push:
-    branches: [ main ]
+# This workflow was intentionally removed. Admin creation and local admin
+# automation was removed from the repository on request. Use the Neon
+# console or direct DB access instead.
 
-jobs:
-  create-admin:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - name: Install requirements
-        run: python -m pip install -r requirements.txt
-      - name: Create admin user
-        env:
-          NEON_DB_URL: ${{ secrets.NEON_DB_URL }}
-        run: |
-          if [ -z "${{ secrets.ADMIN_USERNAME }}" ] || [ -z "${{ secrets.ADMIN_PASSWORD }}" ]; then
-            echo "ADMIN_USERNAME or ADMIN_PASSWORD not set in secrets, skipping admin creation"; exit 0
-          fi
-          python3 scripts/create_admin_user.py --username "${{ secrets.ADMIN_USERNAME }}" --password "${{ secrets.ADMIN_PASSWORD }}" --db "${{ secrets.NEON_DB_URL }}"
+on: {}

@@ -19,7 +19,7 @@ If you want to manage migration keys via HTTP locally, run the admin API server:
 ```bash
 export ADMIN_KEY="un-secret-strong"
 export NEON_DB_URL="postgresql://..."
-python3 scripts/admin_api.py --host 127.0.0.1 --port 8001
+<!-- Local admin API removed; use Neon console or direct DB access instead -->
 ```
 
 Then open `http://localhost:3000/admin` in the frontend, paste the `ADMIN_KEY` and use the UI to generate/list/delete keys.

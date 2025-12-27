@@ -1,6 +1,10 @@
-from src.data.parser import ParserInteligente
-from src.core.optimizer import OptimizadorReal
-from src.core.models import HorarioCrudo, ClaseConDia
+import os
+import uuid
+from datetime import datetime
+
+import streamlit as st
+from collections import defaultdict
+import json
 from src.auth.manager import AuthManager
 
 # Configuración de página
@@ -74,62 +78,28 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Configuración de base de datos remota
-NEON_DB_URL = "postgresql://neondb_owner:npg_IhV8Zt4aoilr@ep-twilight-sound-adxqbeo9-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
+# Configuración de base de datos remota (mantener la existente si corresponde)
+NEON_DB_URL = os.getenv('NEON_DB_URL', "postgresql://neondb_owner:npg_IhV8Zt4aoilr@ep-twilight-sound-adxqbeo9-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require")
 
-# Inicializar estados y clases
+# Admin secret (proteger la vista administrativa). Defínelo en el entorno como ADMIN_SECRET.
+ADMIN_SECRET = os.getenv('ADMIN_SECRET', None)
+
+# Inicializar AuthManager en el state de Streamlit
 if 'auth' not in st.session_state:
     st.session_state.auth = AuthManager(NEON_DB_URL)
+# Asegurar parser y optimizer si el proyecto los incluye (evitar errores al renderizar UI)
 if 'parser' not in st.session_state:
-    st.session_state.parser = ParserInteligente()
+    try:
+        from src.data.parser import ParserInteligente
+        st.session_state.parser = ParserInteligente()
+    except Exception:
+        st.session_state.parser = None
 if 'optimizer' not in st.session_state:
-    st.session_state.optimizer = OptimizadorReal()
-if 'horarios_crudos' not in st.session_state:
-    st.session_state.horarios_crudos = []
-if 'selecciones' not in st.session_state:
-    st.session_state.selecciones = {}
-if 'mejores_horarios' not in st.session_state:
-    st.session_state.mejores_horarios = []
-if 'json_store' not in st.session_state:
-    st.session_state.json_store = {}
-if 'indice_horario' not in st.session_state:
-    st.session_state.indice_horario = 0
-
-# --- SISTEMA DE AUTENTICACIÓN ---
-def form_auth():
-    st.markdown('<h1 class="main-header">🔑 Acceso UniHorario USS</h1>', unsafe_allow_html=True)
-    
-    tab_login, tab_reg = st.tabs(["Inicia Sesión", "Crea una Cuenta"])
-    
-    with tab_login:
-        with st.form("login_form"):
-            u = st.text_input("Usuario")
-            p = st.text_input("Contraseña", type="password")
-            btn = st.form_submit_button("Entrar", use_container_width=True)
-            if btn:
-                success, msg = st.session_state.auth.login(u, p)
-                if success:
-                    st.success(msg)
-                    st.rerun()
-                else:
-                    st.error(msg)
-    
-    with tab_reg:
-        with st.form("reg_form"):
-            new_u = st.text_input("Elige un Usuario")
-            new_t = st.text_input("WhatsApp (Opcional)")
-            new_p = st.text_input("Elige una Contraseña", type="password")
-            reg_btn = st.form_submit_button("Registrarse", use_container_width=True)
-            if reg_btn:
-                ok, res = st.session_state.auth.register(new_u, new_p, new_t)
-                if ok:
-                    st.success(res)
-                else:
-                    st.error(res)
-
-if not st.session_state.auth.is_authenticated:
-    form_auth()
-    st.stop()
+    try:
+        from src.core.optimizer import OptimizadorReal
+        st.session_state.optimizer = OptimizadorReal()
+    except Exception:
+        st.session_state.optimizer = None
 
 # --- HEADER (LOGUEADO) ---
 cols = st.columns([1, 0.2])
@@ -172,16 +142,16 @@ with tab1:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown('<div class="card cat-obligatorio"><div class="cat-title">🌸 Ramos del Semestre (Obligatorios)</div></div>', unsafe_allow_html=True)
-        t0 = st.text_area("Pega aquí tus ramos del semestre", height=250, key="txt_cat0", label_visibility="collapsed")
-    
+        st.markdown('<div class="card cat-obligatorio"><div class="cat-title">📘 Ramos principales</div></div>', unsafe_allow_html=True)
+        t0 = st.text_area("Ramos principales (uno por línea)", height=250, key="txt_cat0", label_visibility="collapsed")
+
     with col2:
-        st.markdown('<div class="card cat-adelantar"><div class="cat-title">☀️ Ramos para Adelantar (Opcionales)</div></div>', unsafe_allow_html=True)
-        t1 = st.text_area("Pega aquí ramos opcionales", height=250, key="txt_cat1", label_visibility="collapsed")
-    
+        st.markdown('<div class="card cat-adelantar"><div class="cat-title">☀️ Ramos para adelantar</div></div>', unsafe_allow_html=True)
+        t1 = st.text_area("Ramos para adelantar (opcional)", height=250, key="txt_cat1", label_visibility="collapsed")
+
     with col3:
-        st.markdown('<div class="card cat-electivo"><div class="cat-title">🍀 Ramos Electivos (Se elige uno)</div></div>', unsafe_allow_html=True)
-        t2 = st.text_area("Pega aquí tus electivos", height=250, key="txt_cat2", label_visibility="collapsed")
+        st.markdown('<div class="card cat-electivo"><div class="cat-title">🍀 Electivos (si no lo tienes claro, elegimos uno al azar entre los que pongas)</div></div>', unsafe_allow_html=True)
+        t2 = st.text_area("Electivos (se elegirá uno si no eliges)", height=250, key="txt_cat2", label_visibility="collapsed")
 
     col_btn1, col_btn2 = st.columns([1, 4])
     with col_btn1:
@@ -249,8 +219,8 @@ with tab2:
 
         for nrc, horarios in agrupados.items():
             p = horarios[0].prioridad
-            cat_class = "cat-obligatorio" if p == 0 else "cat-adelantar" if p == 1 else "cat-electivo"
-            
+            cat_class = "cat-obligatorio" if p == 0 else ("cat-adelantar" if p == 1 else "cat-electivo")
+
             # Verificar si está configurado (todos los bloques tienen día)
             configurado = True
             for i in range(len(horarios)):
@@ -508,3 +478,131 @@ with tab5:
         
         full_json = json.dumps(list(st.session_state.json_store.values()), indent=4, ensure_ascii=False)
         st.download_button("💾 Exportar Base de Datos Completa (JSON)", full_json, file_name="almacen_ramos_completo.json", mime="application/json")
+
+# --- BLOQUE DE AUTENTICACIÓN SIMPLE (encima de las pestañas) ---
+def get_user_info(username: str):
+    """Retorna un dict con info básica del usuario o None si no existe."""
+    if not username:
+        return None
+    try:
+        import psycopg2
+        conn = psycopg2.connect(NEON_DB_URL)
+        cur = conn.cursor()
+        cur.execute('SELECT id, username, is_active, expires_at, telefono FROM usuarios WHERE username = %s', (username,))
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row:
+            return None
+        return {'id': row[0], 'username': row[1], 'is_active': row[2], 'expires_at': row[3], 'telefono': row[4]}
+    except Exception:
+        return None
+
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+with st.container():
+    st.markdown('### Acceso / Registro')
+    with st.form('auth_form'):
+        form_user = st.text_input('Usuario')
+        form_pass = st.text_input('Contraseña', type='password')
+        device_id = st.text_input('device_id (identifica equipo)', value=str(uuid.uuid4())[:12])
+        col_a, col_b = st.columns(2)
+        with col_a:
+            btn_enter = st.form_submit_button('Entrar')
+        with col_b:
+            btn_create = st.form_submit_button('Crear Cuenta')
+
+    if btn_create:
+        ok, msg = st.session_state.auth.register(form_user, form_pass)
+        if ok:
+            st.success(msg + ' Espera a que el admin active la cuenta o establece migrate_pass_hash.')
+        else:
+            st.error(msg)
+
+    if btn_enter:
+        ok, msg = st.session_state.auth.login(form_user, form_pass, device_id=device_id)
+        if ok:
+            st.session_state.logged_in = True
+            st.success(msg)
+        else:
+            st.error(msg)
+            # Si el problema es que la cuenta no está activada, mostrar input para migrate_pass_hash
+            if 'no activada' in (msg or '').lower():
+                st.info('Tu cuenta existe pero no está activada. Pega el migrate_pass_hash que el admin te dio para activarla:')
+                mig_hash = st.text_input('migrate_pass_hash para activar cuenta')
+                if mig_hash and st.button('Aplicar migrate_pass_hash'):
+                    ok2, msg2 = st.session_state.auth.apply_license(form_user, mig_hash)
+                    if ok2:
+                        st.success(msg2)
+                    else:
+                        st.error(msg2)
+
+# --- ADMIN CONSOLE (PROTECTED) ---
+st.markdown("---")
+st.subheader("Consola Administrativa (Protegida)")
+admin_pw = st.text_input("Clave Admin", type="password", help="Clave para acceder a la consola administrativa (definir ADMIN_SECRET en entorno)")
+show_admin = False
+if ADMIN_SECRET is None:
+    st.warning("ADMIN_SECRET no está definido en variable de entorno. Define ADMIN_SECRET para proteger la consola. Mientras tanto, la consola estará oculta.")
+else:
+    if admin_pw:
+        if admin_pw == ADMIN_SECRET:
+            show_admin = True
+        else:
+            st.error("Clave admin incorrecta")
+
+if show_admin:
+    st.success("Acceso admin concedido")
+    st.markdown("#### Usuarios registrados (puedes regenerar el migrate_pass_hash)")
+    # Mostrar usuarios desde la DB en crudo (id, username, is_active, expires_at, telefono, migrate_pass_hash)
+    import psycopg2
+    try:
+        conn = psycopg2.connect(NEON_DB_URL)
+        cur = conn.cursor()
+        cur.execute('SELECT id, username, is_active, expires_at, telefono, migrate_pass_hash FROM usuarios ORDER BY id DESC')
+        rows = cur.fetchall()
+        if not rows:
+            st.info('No hay usuarios registrados aún.')
+        else:
+            for r in rows:
+                uid, uname, is_active, expires_at, telefono, mig_hash = r
+                with st.expander(f'[{uid}] {uname} - activo={is_active}'):
+                    st.write('Telefono:', telefono)
+                    st.write('expires_at:', expires_at)
+                    st.write('migrate_pass_hash (hash que debes copiar y dar al cliente):')
+                    st.code(mig_hash or '<no hash>')
+                    cols = st.columns([1,1,1])
+                    if cols[0].button('Regenerar migrate_pass_hash', key=f'reg_{uid}'):
+                        newh = st.session_state.auth.regenerate_migrate_hash(uname)
+                        if newh:
+                            st.success('Nuevo HASH generado y almacenado. Cópialo y envíaselo al cliente:')
+                            st.code(newh)
+                            st.experimental_rerun()
+                        else:
+                            st.error('No se pudo generar hash')
+                    if cols[1].button('Activar cuenta', key=f'act_{uid}'):
+                        try:
+                            cur2 = conn.cursor()
+                            cur2.execute('UPDATE usuarios SET is_active = TRUE WHERE username = %s', (uname,))
+                            conn.commit()
+                            cur2.close()
+                            st.success('Cuenta activada')
+                            st.experimental_rerun()
+                        except Exception as e:
+                            st.error(f'Error activando: {e}')
+                    if cols[2].button('Eliminar usuario', key=f'del_{uid}'):
+                        try:
+                            cur3 = conn.cursor()
+                            cur3.execute('DELETE FROM usuarios WHERE username = %s', (uname,))
+                            conn.commit()
+                            cur3.close()
+                            st.success('Usuario eliminado')
+                            st.experimental_rerun()
+                        except Exception as e:
+                            st.error(f'Error eliminando: {e}')
+                cur.close(); conn.close()
+    except Exception as e:
+        st.error('Error conectando a la DB: ' + str(e))
+
+st.markdown('\n---\n')
+st.caption("Flujo: el cliente crea cuenta; el admin (tú) entra a esta página, ve la columna migrate_pass_hash y copia la clave para dársela al cliente cuando pida migración entre equipos.")
