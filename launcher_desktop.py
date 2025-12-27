@@ -309,6 +309,74 @@ class HorarioAppProfesional:
                 json.dump(data, f)
         except: pass
 
+    def limpiar_inputs(self):
+        """Borra el contenido de los 3 textbox de entrada si existen."""
+        try:
+            if hasattr(self, 't0'):
+                self.t0.delete('1.0', tk.END)
+            if hasattr(self, 't1'):
+                self.t1.delete('1.0', tk.END)
+            if hasattr(self, 't2'):
+                self.t2.delete('1.0', tk.END)
+        except Exception:
+            pass
+
+    def procesar_todo(self):
+        """Implementación mínima de procesamiento: valida textos y avanza a la pestaña de 'Datos Procesados'."""
+        try:
+            # Chequear licencia (si AuthManager está disponible)
+            try:
+                if hasattr(self, 'auth') and self.auth:
+                    if not getattr(self.auth, 'has_active_license', lambda d: False)(self.device_id):
+                        messagebox.showwarning('Licencia requerida', f'No puedes procesar sin una licencia activa. Contacta: {LICENSE_MIGRATION_CONTACT}', parent=self.root)
+                        return
+            except Exception:
+                # Si falla la comprobación, continuar con precaución
+                pass
+
+            d0 = self.t0.get('1.0', tk.END).strip() if hasattr(self, 't0') else ''
+            d1 = self.t1.get('1.0', tk.END).strip() if hasattr(self, 't1') else ''
+            d2 = self.t2.get('1.0', tk.END).strip() if hasattr(self, 't2') else ''
+            if not any([d0, d1, d2]):
+                messagebox.showwarning('Atención', 'No hay datos para procesar.', parent=self.root)
+                return
+
+            # Mostrar loader mientras se 'procesa'
+            try:
+                self.show_loader('Procesando...')
+                parsed = []
+                modo = self.modo_parser.get() if hasattr(self, 'modo_parser') else 'Auto'
+                if d0 and hasattr(self.parser, 'parsear_texto_por_prioridad'):
+                    parsed.extend(self.parser.parsear_texto_por_prioridad(d0, 0, modo=modo))
+                if d1 and hasattr(self.parser, 'parsear_texto_por_prioridad'):
+                    parsed.extend(self.parser.parsear_texto_por_prioridad(d1, 1, modo=modo))
+                if d2 and hasattr(self.parser, 'parsear_texto_por_prioridad'):
+                    parsed.extend(self.parser.parsear_texto_por_prioridad(d2, 2, modo=modo))
+                self.horarios_crudos = parsed
+            finally:
+                try: self.hide_loader()
+                except: pass
+
+            if not getattr(self, 'horarios_crudos', None):
+                messagebox.showwarning('Parser', 'No se detectaron ramos válidos en el texto.', parent=self.root)
+                return
+
+            # Agrupar y preparar pestaña de configuración si es posible
+            try:
+                agrupados = self.parser.agrupar_por_nrc(self.horarios_crudos) if hasattr(self.parser, 'agrupar_por_nrc') else {}
+                try:
+                    self.cargar_config(agrupados)
+                except Exception:
+                    pass
+                try:
+                    self.tabview.set('2. Datos Procesados')
+                except Exception:
+                    pass
+            except Exception as e:
+                messagebox.showerror('Error', f'Error procesando datos: {e}', parent=self.root)
+        except Exception as e:
+            messagebox.showerror('Error inesperado', str(e), parent=self.root)
+
     def open_license_manager(self):
         if not self.auth or not self.auth.current_user:
             messagebox.showinfo("Licencia", "No has iniciado sesión.")
@@ -568,6 +636,31 @@ class HorarioAppProfesional:
         ctk.CTkButton(ft, text="Limpiar Texto", fg_color="#64748B", hover_color="#475569", command=self.limpiar_inputs, width=160).pack(side="left")
         ctk.CTkButton(ft, text="PROCESAR TODO", width=220, height=40, command=self.procesar_todo, fg_color="#2563EB").pack(side="right")
 
+    def cargar_config(self, agrupados):
+        """Implementación mínima para mostrar los ramos detectados en la pestaña 2.
+        Esto evita errores cuando `procesar_todo` llama a `cargar_config`.
+        """
+        try:
+            tab = self.tabview.tab("2. Datos Procesados")
+            # Limpiar contenido previo si existe
+            for w in tab.winfo_children():
+                try: w.destroy()
+                except: pass
+            f = ctk.CTkFrame(tab)
+            f.pack(fill="both", expand=True, padx=10, pady=10)
+            ctk.CTkLabel(f, text="Ramos detectados (vista simplificada):", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="nw")
+            # Mostrar lista simple
+            for titulo, data in (agrupados.items() if isinstance(agrupados, dict) else []):
+                try:
+                    ctk.CTkLabel(f, text=f"- {titulo}").pack(anchor="nw", padx=6)
+                except Exception:
+                    pass
+            # Guardar referencia mínima
+            self.nrc_widgets = dict(agrupados)
+        except Exception:
+            # Fallback silencioso
+            pass
+
     def setup_tab_config(self):
         pass  # Implementar configuración de tab de configuración
 
@@ -670,5 +763,18 @@ def main():
     app = HorarioAppProfesional(root)
     root.mainloop()
 
+
 if __name__ == "__main__":
-    main()
+    import traceback
+    try:
+        main()
+    except Exception as e:
+        tb = traceback.format_exc()
+        # Guardar traceback en archivo para depuración si la GUI falla al iniciar
+        try:
+            with open('launcher_desktop_error.log', 'w', encoding='utf-8') as fh:
+                fh.write(tb)
+        except Exception:
+            pass
+        print("Error al iniciar la aplicación. Se guardó el traceback en launcher_desktop_error.log")
+        raise
