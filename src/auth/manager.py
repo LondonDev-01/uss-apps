@@ -98,6 +98,8 @@ class AuthManager:
                     if device_id:
                         self._handle_device_session(cur, username, device_id)
 
+                    conn.commit()
+
             self.is_authenticated = True
             self.current_user = username
             return True, "Acceso concedido."
@@ -138,16 +140,17 @@ class AuthManager:
         except Exception as e:
             # Analizar el error y aplicar un flujo de recuperación robusto.
             msg = str(e).lower()
+            conn = cur.connection
             # Caso: ON CONFLICT target no existe en este esquema (mensaje de Postgres)
             if 'there is no unique or exclusion constraint matching the on conflict specification' in msg or 'no unique or exclusion constraint' in msg:
                 # Intentar un INSERT simple y, en caso de violación de unique, reparar
                 try:
+                    conn.rollback()
                     cur.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
                 except Exception as e2:
                     msg2 = str(e2).lower()
                     if 'duplicate key value violates unique constraint' in msg2 or 'unique constraint' in msg2:
                         try:
-                            conn = cur.connection
                             conn.rollback()
                         except Exception:
                             pass
@@ -163,7 +166,6 @@ class AuthManager:
             elif 'duplicate key value violates unique constraint' in msg or 'unique constraint' in msg:
                 # Error de violación única ocurrido con el upsert; reparar con rollback + delete + insert
                 try:
-                    conn = cur.connection
                     conn.rollback()
                 except Exception:
                     pass
