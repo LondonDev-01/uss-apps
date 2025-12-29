@@ -208,6 +208,20 @@ class HorarioAppProfesional:
             ctk.CTkLabel(card, textvariable=self.login_msg_var, text_color="#f59e0b").pack(pady=(6,4))
             btn_login = ctk.CTkButton(card, text="INICIAR SESIÓN", fg_color="#10B981", height=40, command=self._login_from_ui)
             btn_login.pack(pady=(12,8), padx=40, fill="x")
+            # Botón oculto para pegar clave de migración (se muestra solo si falla autologin por sesión en otro equipo)
+            def _on_paste_migrate():
+                try:
+                    # No pedir clave: la activación debe hacerla el admin en la BD
+                    messagebox.showinfo('Información', 'La activación de cuentas se realiza únicamente por el administrador cambiando `is_active` a TRUE en la base de datos. Contacta al administrador para que active tu cuenta.')
+                except Exception as e:
+                    _write_log(f'_on_paste_migrate info error: {e}')
+
+            # Mantener referencia en caso de futuras features, pero oculto por defecto
+            self._btn_paste_migrate = ctk.CTkButton(card, text='Ayuda licencia', fg_color='transparent', command=_on_paste_migrate)
+            try:
+                self._btn_paste_migrate.pack_forget()
+            except Exception:
+                pass
             # Botón para registro (si no tienes cuenta)
             ctk.CTkButton(card, text="¿No tienes cuenta? Regístrate", fg_color="transparent", text_color="#3B82F6", command=self.open_register).pack(pady=(6,4))
         except Exception as e:
@@ -436,16 +450,19 @@ class HorarioAppProfesional:
 
     def _attempt_migrate_from_login(self, u: str, clave: str):
         try:
-            migrate_with_key = getattr(self.auth, 'migrate_with_key', None)
-            if callable(migrate_with_key):
-                return migrate_with_key(u, clave, self.device_id)
-            validate_key = getattr(self.auth, 'validate_migration_key', None)
-            if callable(validate_key) and validate_key(clave, u):
-                return getattr(self.auth, 'migrate_license', lambda *a, **k: (False, 'no impl'))(u, self.device_id)
-            validate_pw = getattr(self.auth, 'validate_migrate_password', None)
-            if callable(validate_pw) and validate_pw(u, clave):
-                return getattr(self.auth, 'migrate_license', lambda *a, **k: (False, 'no impl'))(u, self.device_id)
-            return False, 'Clave inválida'
+            # Preferimos usar la función nueva que valida, activa y crea/reemplaza la sesión
+            fn = getattr(self.auth, 'apply_license_and_activate', None)
+            if callable(fn):
+                return fn(u, clave, self.device_id)
+            # Fallback: usar apply_license si está disponible (no activa automáticamente)
+            fn2 = getattr(self.auth, 'apply_license', None)
+            if callable(fn2):
+                ok, msg = fn2(u, clave)
+                if ok:
+                    # intentar migrar sesión
+                    return getattr(self.auth, 'migrate_license', lambda *a, **k: (False, 'migrate no impl'))(u, self.device_id)
+                return False, msg
+            return False, 'Funcionalidad de migración no implementada en AuthManager.'
         except Exception as e:
             return False, str(e)
 
@@ -561,7 +578,6 @@ class HorarioAppProfesional:
         ctk.CTkLabel(win, text=f"Usuario: {cur}", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(12,6))
         ctk.CTkLabel(win, text=f"Dispositivo activo: {active if active else 'ninguno'}", font=ctk.CTkFont(size=12)).pack(pady=(0,10))
         ctk.CTkLabel(win, text=f"Si necesitas migrar, contacta: {LICENSE_MIGRATION_CONTACT}", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(6,0))
-        ctk.CTkLabel(win, text=f"Clave de migración: {LICENSE_MIGRATION_HASH[:16]}... (proporcionada por el desarrollador)", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0,6))
 
         def do_release():
             if not active:
@@ -594,44 +610,9 @@ class HorarioAppProfesional:
                 else:
                     messagebox.showerror("Error", msg)
 
-            # Alternativa: migrar con clave (válida si está en DB y no expiró)
-            clave = ctk.CTkInputDialog(text="Ingresa la clave de migración proporcionada por el admin:", title="Migrar con clave").get_input()
-            if not clave:
-                return
-            valid = False
-            try:
-                # Intentar métodos de validación si existen en AuthManager (fallback a False)
-                validate_key = getattr(self.auth, 'validate_migration_key', lambda *a, **k: False)
-                validate_pw = getattr(self.auth, 'validate_migrate_password', lambda *a, **k: False)
-                # Primero intentar con clave temporal
-                valid = bool(validate_key(clave.strip(), cur))
-                # Si no es válida, intentar con la contraseña de migración del usuario
-                if not valid:
-                    valid = bool(validate_pw(cur, clave.strip()))
-                    if valid:
-                        # password-based migration: allow but do not delete server key
-                        pass
-            except Exception:
-                valid = False
-            if valid:
-                ok, msg = self.auth.migrate_license(cur, self.device_id)
-                if ok:
-                    # borrar clave usada
-                    try:
-                        # Si la clave era una migration_key, elimínala; si fue password-based, no la borramos
-                        delete_key = getattr(self.auth, 'delete_migration_key', None)
-                        if callable(delete_key):
-                            delete_key(clave.strip())
-                    except: pass
-                    messagebox.showinfo("Éxito", "Licencia migrada correctamente a este equipo.")
-                    self.lbl_user_info.configure(text=f"Sesión: {cur} (Licencia migrada)")
-                    self.guardar_sesion(cur, 'LICENSE-MIGRATION')
-                    win.destroy()
-                    self._update_license_ui()
-                else:
-                    messagebox.showerror("Error", msg)
-            else:
-                messagebox.showerror("Error", "Clave de migración inválida o expirada. Contacta al admin.")
+            # Nota: la migración por clave fue removida de la UI. Si necesitas migrar,
+            # contacta al administrador para que active o libere la sesión desde la base de datos.
+            # El flujo de transferencia por contraseña sigue disponible arriba.
 
         btn_rel = ctk.CTkButton(win, text="Liberar sesión remota", fg_color="#f97316", command=do_release)
         btn_rel.pack(pady=(6,4), padx=30, fill="x")
@@ -732,57 +713,36 @@ class HorarioAppProfesional:
                 pass
             return
 
-        # Si falla y el mensaje indica "otro dispositivo", pedir migrate_pass al usuario
+        # Si falla y el mensaje indica "otro dispositivo", instruir al usuario a contactar al admin
         try:
             if isinstance(msg, str) and "otro dispositivo" in msg.lower():
-                # Si fue autologin, NO mostrar modal repetido: abrir la ventana de login y mostrar instrucción
                 if autologin:
                     try:
-                        # Asegurar que la ventana de login exista y esté visible
+                        if not (hasattr(self, 'login_win_ref') and self.login_win_ref):
+                            self.abrir_login()
+                    except Exception as e:
+                        _write_log(f"abrir_login during autologin prefill failed: {e}")
+                    try:
+                        self.login_user_entry.delete(0, tk.END)
+                        self.login_user_entry.insert(0, u)
                         try:
-                            if not (hasattr(self, 'login_win_ref') and self.login_win_ref):
-                                self.abrir_login()
-                        except Exception as e:
-                            _write_log(f"abrir_login during autologin prefill failed: {e}")
-                        # Intentar prellenar campos y mostrar instrucción + botón de pegar clave
+                            self.login_pass_entry.delete(0, tk.END)
+                        except Exception:
+                            pass
                         try:
-                            self.login_user_entry.delete(0, tk.END); self.login_user_entry.insert(0, u)
-                            try: self.login_pass_entry.delete(0, tk.END)
-                            except Exception: pass
-                            try: self.login_msg_var.set("Cuenta activa en otro dispositivo. Pega la clave de migración si la tienes (SUBARU).")
-                            except Exception: pass
-                            # mostrar el botón para pegar la clave (si existe)
-                            try: self._btn_paste_migrate.pack(pady=(6,8))
-                            except Exception:
-                                pass
-                            try:
-                                if hasattr(self, 'login_win_ref') and self.login_win_ref:
-                                    self.login_win_ref.deiconify(); self.login_win_ref.lift()
-                            except Exception:
-                                pass
-                        except Exception as e:
-                            _write_log(f"autologin prefill error: {e}")
-                        return
-                    except Exception:
-                        return
+                            self.login_msg_var.set("Cuenta activa en otro dispositivo. Contacta al administrador para liberar o activar la sesión en la base de datos.")
+                        except Exception:
+                            pass
+                        try:
+                            if hasattr(self, 'login_win_ref') and self.login_win_ref:
+                                self.login_win_ref.deiconify(); self.login_win_ref.lift()
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        _write_log(f"autologin prefill error: {e}")
+                    return
                 else:
-                    # Login manual: ofrecer pegar la clave inmediatamente
-                    messagebox.showinfo("Transferencia requerida", "Tu cuenta está activa en otro dispositivo. Pega la clave de migración proporcionada por SUBARU en el diálogo siguiente.")
-                    clave = ctk.CTkInputDialog(text="Pega aquí la clave de migración (migrate_pass):", title="Clave de migración").get_input()
-                    if clave:
-                        ok2, msg2 = self._attempt_migrate_from_login(u, clave.strip())
-                        if ok2:
-                            try: self.guardar_sesion(u, 'LICENSE-MIGRATION')
-                            except Exception: pass
-                            messagebox.showinfo("Éxito", "Licencia migrada correctamente a este equipo.")
-                            try: self.lbl_user_info.configure(text=f"Sesión: {u} (Licencia migrada)")
-                            except Exception: pass
-                            try: self._update_license_ui()
-                            except Exception: pass
-                            return
-                        else:
-                            messagebox.showerror("Error", f"No se pudo migrar: {msg2}")
-                            return
+                    messagebox.showinfo("Transferencia requerida", "Tu cuenta está activa en otro dispositivo. Contacta al administrador para liberar la sesión o activar este equipo en la base de datos.")
                     return
         except Exception:
             pass
@@ -829,7 +789,7 @@ class HorarioAppProfesional:
     def procesar_todo(self):
         # Requerir licencia activa antes de procesar
         if not self.auth.has_active_license(self.device_id):
-            messagebox.showwarning("Licencia requerida", f"No puedes procesar sin una licencia activa. Migra tu licencia contactando al desarrollador ({LICENSE_MIGRATION_CONTACT}) y proporciona esta llave: {LICENSE_MIGRATION_HASH}")
+            messagebox.showwarning("Licencia requerida", "No puedes procesar sin una licencia activa. Contacta al administrador para que active tu cuenta en la base de datos (cambiar `is_active` a TRUE).")
             return
 
         # Leer datos de UI (rápido) y delegar el parsing a un hilo para no bloquear la UI
@@ -1067,26 +1027,21 @@ class HorarioAppProfesional:
             pass
 
         dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-        # Generar lista de horas según la regla: empezar 08:00, sumar 1h30 repetidamente hasta
-        # que el siguiente cruce pase 16:10; en ese caso, el último incremento será de 1h25.
-        horas_list = []
-        from datetime import time, datetime, timedelta
-        cur = datetime.combine(datetime.today(), time(hour=8, minute=0))
-        limit = datetime.combine(datetime.today(), time(hour=16, minute=10))
-        while True:
-            horas_list.append(cur.time().strftime('%H:%M'))
-            # calcular siguiente con 1h30
-            next1 = cur + timedelta(hours=1, minutes=30)
-            if next1 > limit:
-                # aplicar incremento final de 1h25 y terminar
-                cur = cur + timedelta(hours=1, minutes=25)
-                horas_list.append(cur.time().strftime('%H:%M'))
-                break
-            cur = next1
-            # evitar bucle infinito si se pasa de 23:59
-            if cur.day != datetime.today().day:
-                break
-        horas = horas_list
+        # Generar lista de horas (slots) personalizados solicitados por el usuario.
+        # Estos son los inicios de bloque que se usarán como filas. Las clases se
+        # colocan en la última fila cuyo start <= hora_inicio_de_clase.
+        # Puedes ajustar esta lista si prefieres otros horarios.
+        horas = [
+            "08:00",
+            "09:30",
+            "11:00",
+            "12:30",
+            "13:11",
+            "14:40",
+            "16:00",
+            "17:35",
+            "19:00",
+        ]
 
         # Configurar grid
         self.scroll_g.grid_columnconfigure(0, minsize=70)  # Columna de horas
@@ -1260,6 +1215,7 @@ class HorarioAppProfesional:
         ft = ctk.CTkFrame(tab, fg_color="transparent")
         ft.grid(row=1, column=0, sticky="ew", pady=(5,0))
         ctk.CTkButton(ft, text="EXPORTAR HORARIO A CSV", command=self.export_current_schedule_csv, width=240, height=50).pack(side="right", padx=10)
+        ctk.CTkButton(ft, text="EXPORTAR HORARIO A XLSX", command=self.export_current_schedule_xlsx, width=240, height=50).pack(side="right", padx=10)
 
     def copiar_json(self):
         try:
@@ -1305,10 +1261,24 @@ class HorarioAppProfesional:
                 return
             idx = self.indice_horario_actual or 0
             cls = self.mejores_horarios[idx]
-            # Construir filas: NRC, titulo, tipo, seccion, dia, hora, lugar
-            rows = []
+            # Construir filas agrupadas por (NRC, Titulo, Tipo) con hasta 3 bloques
+            grouped = {}
             for c in cls:
-                rows.append([getattr(c,'nrc',''), getattr(c,'titulo',''), getattr(c,'tipo',''), getattr(c,'seccion',''), getattr(c,'dia',''), f"{getattr(c,'hora_inicio','')}-{getattr(c,'hora_fin','')}", f"{getattr(c,'edificio','')} {getattr(c,'salon','')}".strip()])
+                key = (getattr(c, 'nrc', ''), getattr(c, 'titulo', ''), getattr(c, 'tipo', ''))
+                lugar = f"{getattr(c,'edificio','') or ''} {getattr(c,'salon','') or ''}".strip()
+                # evitar 'N/A' u otros placeholders; si no hay lugar, dejar vacío
+                if lugar.lower() in ('n/a', 'na', '-', 's/i'):
+                    lugar = ''
+                bloque = f"{getattr(c,'dia','')} {getattr(c,'hora_inicio','')}-{getattr(c,'hora_fin','')}" + (f" {lugar}" if lugar else "")
+                grouped.setdefault(key, []).append(bloque)
+
+            # Normalizar a filas con 3 bloques (vacíos si no alcanzan)
+            rows = []
+            for (nrc, titulo, tipo), bloques in grouped.items():
+                b1 = bloques[0] if len(bloques) > 0 else ''
+                b2 = bloques[1] if len(bloques) > 1 else ''
+                b3 = bloques[2] if len(bloques) > 2 else ''
+                rows.append([nrc, titulo, tipo, b1, b2, b3])
             # Pedir nombre de archivo
             nombre = ctk.CTkInputDialog(text='Ingresa nombre para el archivo (sin extensión):', title='Exportar CSV').get_input()
             if not nombre:
@@ -1320,11 +1290,208 @@ class HorarioAppProfesional:
                 return
             ruta = os.path.join(carpeta, nombre)
             import csv
+            # Escribir CSV y, debajo, una representación textual del horario
             with open(ruta, 'w', encoding='utf-8', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['NRC','Titulo','Tipo','Seccion','Dia','Hora','Lugar'])
+                writer.writerow(['NRC','Titulo','Tipo','Bloque 1','Bloque 2','Bloque 3'])
                 for r in rows:
                     writer.writerow(r)
+
+                # Línea en blanco y sección de "ARMADO DEL HORARIO"
+                f.write('\n')
+                f.write('ARMADO DEL HORARIO:\n')
+                # Agrupar por día y ordenar por hora para mostrar como en la app
+                schedule_by_day = {}
+                for c in cls:
+                    dia = getattr(c, 'dia', '')
+                    if not dia:
+                        continue
+                    lugar = f"{getattr(c,'edificio','') or ''} {getattr(c,'salon','') or ''}".strip()
+                    if lugar.lower() in ('n/a', 'na', '-', 's/i'):
+                        lugar = ''
+                    hora_range = f"{getattr(c,'hora_inicio','')}-{getattr(c,'hora_fin','')}"
+                    title = getattr(c, 'titulo', '')
+                    nrc = getattr(c, 'nrc', '')
+                    line = f"{dia} {hora_range} {lugar} — {title} ({nrc})" if lugar else f"{dia} {hora_range} — {title} ({nrc})"
+                    schedule_by_day.setdefault(dia, []).append((getattr(c,'hora_inicio',''), line))
+
+                # Order days sensibly
+                day_order = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+                for d in day_order:
+                    items = schedule_by_day.get(d, [])
+                    if not items:
+                        continue
+                    # ordenar por hora_inicio
+                    items.sort(key=lambda x: x[0])
+                    f.write(f"\n{d}:\n")
+                    for _, line in items:
+                        f.write(line + '\n')
+
+        except Exception as e:
+            messagebox.showerror('Error', f'No se pudo exportar CSV: {e}')
+
+    def export_current_schedule_xlsx(self):
+        try:
+            if not self.mejores_horarios:
+                messagebox.showwarning('Exportar', 'No hay horario generado para exportar.')
+                return
+            try:
+                from openpyxl import Workbook
+                from openpyxl.styles import PatternFill, Alignment, Font
+            except Exception:
+                messagebox.showerror('Dependencia faltante', 'Para exportar a XLSX instala `openpyxl`:\n\npython3 -m pip install openpyxl')
+                return
+
+            idx = self.indice_horario_actual or 0
+            cls = self.mejores_horarios[idx]
+
+            nombre = ctk.CTkInputDialog(text='Ingresa nombre para el archivo (sin extensión):', title='Exportar XLSX').get_input()
+            if not nombre:
+                return
+            if not nombre.endswith('.xlsx'):
+                nombre += '.xlsx'
+            carpeta = filedialog.askdirectory(title='Selecciona carpeta de destino')
+            if not carpeta:
+                return
+            ruta = os.path.join(carpeta, nombre)
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = 'Lista'
+
+            # Header
+            headers = ['NRC', 'Titulo', 'Tipo', 'Bloque 1', 'Bloque 2', 'Bloque 3']
+            ws.append(headers)
+
+            # Reuse grouped rows logic from CSV
+            grouped = {}
+            for c in cls:
+                key = (getattr(c, 'nrc', ''), getattr(c, 'titulo', ''), getattr(c, 'tipo', ''))
+                lugar = f"{getattr(c,'edificio','') or ''} {getattr(c,'salon','') or ''}".strip()
+                if lugar.lower() in ('n/a', 'na', '-', 's/i'):
+                    lugar = ''
+                bloque = f"{getattr(c,'dia','')} {getattr(c,'hora_inicio','')}-{getattr(c,'hora_fin','')}" + (f" {lugar}" if lugar else "")
+                grouped.setdefault(key, []).append(bloque)
+
+            for (nrc, titulo, tipo), bloques in grouped.items():
+                row = [nrc, titulo, tipo]
+                row.extend([bloques[i] if i < len(bloques) else '' for i in range(3)])
+                ws.append(row)
+
+            # Auto-size columns (basic)
+            for col in ws.columns:
+                max_len = 0
+                col_letter = col[0].column_letter
+                for cell in col:
+                    try:
+                        v = str(cell.value or '')
+                        if len(v) > max_len:
+                            max_len = len(v)
+                    except Exception:
+                        pass
+                ws.column_dimensions[col_letter].width = min(60, max(10, max_len + 2))
+
+            # Crear hoja visual del horario
+            horarios_sheet = wb.create_sheet(title='Horario')
+            dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+            # Slots (mismos que UI)
+            slots = [
+                "08:00","09:30","11:00","12:30","13:11","14:40","16:00","17:35","19:00"
+            ]
+
+            # Escribir cabecera
+            horarios_sheet.cell(row=1, column=1, value='Hora')
+            for i, d in enumerate(dias):
+                horarios_sheet.cell(row=1, column=2 + i, value=d)
+
+            # Escribir filas de slots
+            for r, s in enumerate(slots, start=2):
+                horarios_sheet.cell(row=r, column=1, value=s)
+
+            # Build start_minutes for bisect logic
+            start_minutes = []
+            for hh in slots:
+                h, m = [int(x) for x in hh.split(':')]
+                start_minutes.append(h*60 + m)
+
+            import bisect
+            # Map NRC/title to color
+            color_map = self.mapa_colores_actual if getattr(self, 'mapa_colores_actual', None) else {}
+
+            for c in cls:
+                dia = getattr(c, 'dia', '')
+                if dia not in dias:
+                    continue
+                hi = getattr(c, 'hora_inicio','')
+                hf = getattr(c, 'hora_fin','')
+                try:
+                    hhi, mmi = [int(x) for x in hi.split(':')]
+                    hi_min = hhi*60 + mmi
+                except Exception:
+                    continue
+                try:
+                    hhf, mmf = [int(x) for x in hf.split(':')]
+                    hf_min = hhf*60 + mmf
+                except Exception:
+                    hf_min = hi_min + 80
+
+                idx = bisect.bisect_right(start_minutes, hi_min) - 1
+                if idx < 0:
+                    idx = 0
+                # determine span of rows
+                # find first slot index >= hf_min then minus one
+                end_idx = bisect.bisect_left(start_minutes, hf_min)
+                if end_idx <= idx:
+                    row_span = 1
+                else:
+                    row_span = end_idx - idx
+
+                row_start = 2 + idx
+                col = 2 + dias.index(dia)
+
+                # Merge cells vertically to represent duration
+                try:
+                    if row_span > 1:
+                        horarios_sheet.merge_cells(start_row=row_start, start_column=col, end_row=row_start + row_span - 1, end_column=col)
+
+                    cell = horarios_sheet.cell(row=row_start, column=col)
+                    title = getattr(c, 'titulo', '')
+                    nrc = getattr(c, 'nrc', '')
+                    lugar = f"{getattr(c,'edificio','') or ''} {getattr(c,'salon','') or ''}".strip()
+                    text = f"{title}\n{hi}-{hf}" + (f"\n{lugar}" if lugar and lugar.lower() not in ('n/a','na','s/i','-') else '')
+                    cell.value = text
+                    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                    cell.font = Font(bold=True, color='FFFFFF')
+
+                    # Fill color
+                    hex_color = color_map.get(getattr(c,'nrc',''), '#2563EB')
+                    if hex_color.startswith('#'):
+                        hex_color = hex_color[1:]
+                    fill = PatternFill(start_color=hex_color, end_color=hex_color, fill_type='solid')
+                    cell.fill = fill
+                except Exception:
+                    pass
+
+            # Ajustes visuales
+            for col_idx in range(1, 2 + len(dias)):
+                horarios_sheet.column_dimensions[horarios_sheet.cell(row=1, column=col_idx).column_letter].width = 25 if col_idx > 1 else 12
+            for r in range(2, 2 + len(slots)):
+                horarios_sheet.row_dimensions[r].height = 28
+
+            # Leyenda al final de la hoja
+            legend_row = 2 + len(slots) + 2
+            horarios_sheet.cell(row=legend_row, column=1, value='Leyenda:')
+            cur_col = 2
+            for nrc, color in color_map.items():
+                cell = horarios_sheet.cell(row=legend_row, column=cur_col, value=str(nrc))
+                hexc = color[1:] if color.startswith('#') else color
+                cell.fill = PatternFill(start_color=hexc, end_color=hexc, fill_type='solid')
+                cur_col += 1
+
+            wb.save(ruta)
+            messagebox.showinfo('Exportar', f'Archivo exportado: {ruta}')
+        except Exception as e:
+            messagebox.showerror('Error', str(e))
             messagebox.showinfo('Exportar', f'Archivo exportado: {ruta}')
         except Exception as e:
             messagebox.showerror('Error', str(e))
