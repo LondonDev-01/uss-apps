@@ -137,18 +137,27 @@ class AuthManager:
             )
         except Exception as e:
             # Detectar violación única y reparar borrando sesiones anteriores
-            try:
-                # psycopg2.errors.UniqueViolation sería la excepción específica,
-                # pero capturamos genérico por compatibilidad y revisamos el mensaje.
-                msg = str(e).lower()
-                if 'duplicate key value violates unique constraint' in msg or 'unique constraint' in msg:
-                    cur.execute("DELETE FROM active_sessions WHERE username = %s", (username,))
-                    cur.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
-                else:
-                    # Si no es un UniqueViolation, volver a lanzar para que el caller lo vea
+            # psycopg2.errors.UniqueViolation sería la excepción específica,
+            # pero capturamos genérico por compatibilidad y revisamos el mensaje.
+            msg = str(e).lower()
+            if 'duplicate key value violates unique constraint' in msg or 'unique constraint' in msg:
+                # Al ocurrir un error de constraint, la transacción queda abortada en Postgres;
+                # debemos hacer ROLLBACK y abrir una nueva transacción para reparar las filas.
+                try:
+                    conn = cur.connection
+                    conn.rollback()
+                except Exception:
+                    pass
+                try:
+                    with conn.cursor() as repair_cur:
+                        repair_cur.execute("DELETE FROM active_sessions WHERE username = %s", (username,))
+                        repair_cur.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
+                    conn.commit()
+                except Exception:
+                    # Si falla la reparación, relanzamos para que el caller lo vea
                     raise
-            except Exception:
-                # No queremos que un fallo en sesión bloquee el login; re-lanzar
+            else:
+                # Si no es un UniqueViolation, volver a lanzar para que el caller lo vea
                 raise
 
     # ---------- Logout ----------
