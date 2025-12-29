@@ -136,13 +136,32 @@ class AuthManager:
                 (username, device_id, datetime.now())
             )
         except Exception as e:
-            # Detectar violación única y reparar borrando sesiones anteriores
-            # psycopg2.errors.UniqueViolation sería la excepción específica,
-            # pero capturamos genérico por compatibilidad y revisamos el mensaje.
+            # Analizar el error y aplicar un flujo de recuperación robusto.
             msg = str(e).lower()
-            if 'duplicate key value violates unique constraint' in msg or 'unique constraint' in msg:
-                # Al ocurrir un error de constraint, la transacción queda abortada en Postgres;
-                # debemos hacer ROLLBACK y abrir una nueva transacción para reparar las filas.
+            # Caso: ON CONFLICT target no existe en este esquema (mensaje de Postgres)
+            if 'there is no unique or exclusion constraint matching the on conflict specification' in msg or 'no unique or exclusion constraint' in msg:
+                # Intentar un INSERT simple y, en caso de violación de unique, reparar
+                try:
+                    cur.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
+                except Exception as e2:
+                    msg2 = str(e2).lower()
+                    if 'duplicate key value violates unique constraint' in msg2 or 'unique constraint' in msg2:
+                        try:
+                            conn = cur.connection
+                            conn.rollback()
+                        except Exception:
+                            pass
+                        try:
+                            with conn.cursor() as repair_cur:
+                                repair_cur.execute("DELETE FROM active_sessions WHERE username = %s", (username,))
+                                repair_cur.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
+                            conn.commit()
+                        except Exception:
+                            raise
+                    else:
+                        raise
+            elif 'duplicate key value violates unique constraint' in msg or 'unique constraint' in msg:
+                # Error de violación única ocurrido con el upsert; reparar con rollback + delete + insert
                 try:
                     conn = cur.connection
                     conn.rollback()
@@ -154,10 +173,9 @@ class AuthManager:
                         repair_cur.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
                     conn.commit()
                 except Exception:
-                    # Si falla la reparación, relanzamos para que el caller lo vea
                     raise
             else:
-                # Si no es un UniqueViolation, volver a lanzar para que el caller lo vea
+                # Otro error inesperado: relanzar
                 raise
 
     # ---------- Logout ----------
