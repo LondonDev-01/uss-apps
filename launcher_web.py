@@ -60,7 +60,7 @@ def _render_login_block():
         st.session_state.auth_mode = 'Entrar'
 
     st.markdown('### Acceso / Registro')
-    mode = st.radio('', ['Entrar', 'Crear Cuenta'], index=0 if st.session_state.auth_mode == 'Entrar' else 1, horizontal=True, key='auth_mode_radio', label_visibility='collapsed')
+    mode = st.radio('Modo', ['Entrar', 'Crear Cuenta'], index=0 if st.session_state.auth_mode == 'Entrar' else 1, horizontal=True, key='auth_mode_radio', label_visibility='collapsed')
     st.session_state.auth_mode = mode
 
     if mode == 'Entrar':
