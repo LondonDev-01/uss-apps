@@ -126,10 +126,30 @@ class AuthManager:
                 WHERE username = %s AND device_id = %s
             """, (username, devices[0]))
 
-        cur.execute("""
-            INSERT INTO active_sessions (username, device_id, last_seen)
-            VALUES (%s, %s, %s)
-        """, (username, device_id, datetime.now()))
+        # Intentar insertar con upsert; si la tabla tiene una restricción única
+        # solo por `username` (esquemas antiguos), capturamos la violación y
+        # reemplazamos la(s) sesión(es) previas para permitir el login en el
+        # nuevo dispositivo.
+        try:
+            cur.execute(
+                "INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s) ON CONFLICT (username, device_id) DO UPDATE SET last_seen = EXCLUDED.last_seen",
+                (username, device_id, datetime.now())
+            )
+        except Exception as e:
+            # Detectar violación única y reparar borrando sesiones anteriores
+            try:
+                # psycopg2.errors.UniqueViolation sería la excepción específica,
+                # pero capturamos genérico por compatibilidad y revisamos el mensaje.
+                msg = str(e).lower()
+                if 'duplicate key value violates unique constraint' in msg or 'unique constraint' in msg:
+                    cur.execute("DELETE FROM active_sessions WHERE username = %s", (username,))
+                    cur.execute("INSERT INTO active_sessions (username, device_id, last_seen) VALUES (%s, %s, %s)", (username, device_id, datetime.now()))
+                else:
+                    # Si no es un UniqueViolation, volver a lanzar para que el caller lo vea
+                    raise
+            except Exception:
+                # No queremos que un fallo en sesión bloquee el login; re-lanzar
+                raise
 
     # ---------- Logout ----------
     def logout(self, username: Optional[str] = None, device_id: Optional[str] = None):
