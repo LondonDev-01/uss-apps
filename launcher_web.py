@@ -95,6 +95,14 @@ def _render_login_block():
                 elif '2 dispositivos' in lowered or '2 dispositivo' in lowered or 'ya fue ingresada anteriormente' in lowered:
                     st.info("La cuenta ya tiene 2 dispositivos activos. Contacta al administrador para liberar una sesión o activar este equipo.")
 
+        st.markdown("---")
+        if st.button("Continuar sin cuenta (Invitado) ➜", use_container_width=True):
+            st.session_state.logged_in = True
+            # Aseguramos que el objeto auth tenga el atributo setead en caso de ser el stub o el manager real
+            if hasattr(st.session_state, 'auth'):
+                st.session_state.auth.current_user = "Invitado"
+            st.rerun()
+
     else:  # Crear Cuenta
         with st.form('create_account_form'):
             reg_user = st.text_input('Nombre de usuario (nuevo)')
@@ -233,6 +241,7 @@ with cols[1]:
                 st.session_state.auth.logout()
             except Exception:
                 pass
+            st.session_state.logged_in = False
             st.rerun()
     # Badge
     if cur_user != 'Invitado':
