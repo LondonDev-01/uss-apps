@@ -118,7 +118,7 @@ function calcTeoLabGap(horario: ClaseConDia[]): number {
 function normTipo(tipo: string): 'TEO' | 'LAB' | 'OTRO' {
   const up = (tipo || '').toUpperCase()
   if (up.includes('TEOR') || up.includes('TEO')) return 'TEO'
-  if (up.includes('LAB') || up.includes('TALLER') || up.includes('PRACT')) return 'LAB'
+  if (up.includes('LAB') || up.includes('TALLER') || up === 'TAL' || up.includes('PRACT')) return 'LAB'
   return 'OTRO'
 }
 
@@ -184,7 +184,7 @@ export function procesarSeleccionesUsuario(
 
 export function generarTopHorarios(
   candidatos: ClaseConDia[],
-  topN = 20,
+  topN = 10,
   preferencias: Preferencias
 ): { horarios: ClaseConDia[][]; mensaje: string; excluidos: string[] } {
   const prioridadPorTitulo: Record<string, number> = {}
@@ -244,7 +244,7 @@ export function generarTopHorarios(
 
   let total = 1
   for (const op of listaFinal) total *= op.length
-  const LIMITE = 5_000_000
+  const LIMITE = 500_000
   if (total > LIMITE) {
     return {
       horarios: [],
@@ -309,7 +309,7 @@ export function generarTopHorarios(
     for (const layoutPrevio of vistosLayouts) {
       let inter = 0
       for (const l of layoutActual) if (layoutPrevio.has(l)) inter++
-      if (inter / layoutActual.size > 0.90) { similar = true; break }
+      if (inter / layoutActual.size > 0.80) { similar = true; break }
     }
 
     if (!similar) {
@@ -320,7 +320,7 @@ export function generarTopHorarios(
     if (mejores.length >= topN) break
   }
 
-  if (mejores.length < Math.min(topN, 5)) {
+  if (mejores.length < Math.min(topN, 3)) {
     for (const [, h] of validos) {
       const signature = [...new Set(h.map(c => c.nrc))].sort().join('|')
       if (!vistosSignatures.has(signature)) {
