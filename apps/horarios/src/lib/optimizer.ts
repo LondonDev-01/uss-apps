@@ -206,11 +206,17 @@ export function generarTopHorarios(
     0: {}, 1: {}, 2: {}
   }
   for (const [, blocks] of Object.entries(blocksList)) {
-    const base = blocks[0]
-    const tipoNorm = normTipo(base.tipo)
-    const p = base.prioridad as 0 | 1 | 2
-    ;(ramosPorPrioridad[p] ??= {})[base.titulo] ??= {}
-    ;(ramosPorPrioridad[p][base.titulo][tipoNorm] ??= []).push(blocks)
+    const p = blocks[0].prioridad as 0 | 1 | 2
+    const titulo = blocks[0].titulo
+    const porTipo: Record<string, ClaseConDia[]> = {}
+    for (const b of blocks) {
+      const tn = normTipo(b.tipo)
+      ;(porTipo[tn] ??= []).push(b)
+    }
+    for (const [tn, tipoBlocks] of Object.entries(porTipo)) {
+      ;(ramosPorPrioridad[p] ??= {})[titulo] ??= {}
+      ;(ramosPorPrioridad[p][titulo][tn] ??= []).push(tipoBlocks)
+    }
   }
 
   const [opts0, nombres0] = consolidarOpciones(ramosPorPrioridad[0] ?? {})
@@ -273,6 +279,16 @@ export function generarTopHorarios(
       if (!titlesEnPlano.has(t)) { incluyeTodoP0 = false; break }
     }
     if (!incluyeTodoP0) continue
+
+    let mezclaNrcs = false
+    const nrcsPorCursoYTipo: Record<string, Set<string>> = {}
+    for (const c of plano) {
+      const k = `${c.titulo}|${normTipo(c.tipo)}`
+      if (!nrcsPorCursoYTipo[k]) nrcsPorCursoYTipo[k] = new Set()
+      nrcsPorCursoYTipo[k].add(c.nrc)
+      if (nrcsPorCursoYTipo[k].size > 1) { mezclaNrcs = true; break }
+    }
+    if (mezclaNrcs) continue
 
     const [valido, msg] = verificarConflictos(plano)
     if (valido) {
