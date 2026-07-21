@@ -267,42 +267,28 @@ function computeStats(horarios: HorarioCrudo[]): Stats {
 }
 
 function CourseBreakdownCard({ course }: { course: CourseInfo }) {
+  const teoText = course.hasTeo
+    ? 'Teoria: ' + course.teoSections.map((sec, i) => {
+        const label = course.teoSections.length > 1 ? 'Opcion ' + String.fromCharCode(65 + i) + ': ' : ''
+        return label + sec.clases.map(c => c.dia + ' ' + c.hora).join(', ')
+      }).join(' | ')
+    : null
+
+  const labText = course.hasLab
+    ? 'Laboratorio: ' + course.labSections.map((sec, i) => {
+        const label = course.labSections.length > 1 ? 'Opcion ' + String.fromCharCode(65 + i) + ': ' : ''
+        return label + sec.clases.map(c => c.dia + ' ' + c.hora).join(', ')
+      }).join(' | ')
+    : null
+
+  const cargaText = 'Carga semanal: ' + course.clasesPorSemana + ' clase' + (course.clasesPorSemana !== 1 ? 's' : '')
+
   return (
     <div className="rounded-lg border border-border bg-bg-elevated p-4 space-y-1.5 text-xs">
       <p className="text-sm font-bold text-fg">{course.titulo}</p>
-      {course.hasTeo && (
-        <p className="text-fg/80">
-          <span className="font-semibold text-fg">TEO: </span>
-          {course.teoSections.map((sec, i) => (
-            <span key={sec.seccion}>
-              {i > 0 && <span className="text-muted"> o </span>}
-              <span className="font-mono text-fg">{sec.seccion}</span>
-              {' '}({sec.clases.length} clase{sec.clases.length !== 1 ? 's' : ''}: {sec.clases.map(c => c.dia + ' ' + c.hora).join(', ')})
-            </span>
-          ))}
-        </p>
-      )}
-      {course.hasLab && (
-        <p className="text-fg/80">
-          <span className="font-semibold text-fg">LAB: </span>
-          {course.labSections.map((sec, i) => (
-            <span key={sec.seccion}>
-              {i > 0 && <span className="text-muted"> o </span>}
-              <span className="font-mono text-fg">{sec.seccion}</span>
-              {' '}({sec.clases.length} clase{sec.clases.length !== 1 ? 's' : ''}: {sec.clases.map(c => c.dia + ' ' + c.hora).join(', ')})
-            </span>
-          ))}
-        </p>
-      )}
-      <p className="text-fg/60 pt-1">
-        Carga real: {course.clasesPorSemana} clase{course.clasesPorSemana !== 1 ? 's' : ''}/semana
-        {course.hasTeo && course.hasLab && (
-          <span>
-            {' '}({course.teoSections[0] ? course.teoSections[0].clases.length : 0} TEO +{' '}
-            {course.labSections[0] ? course.labSections[0].clases.length : 0} LAB)
-          </span>
-        )}
-      </p>
+      {teoText && <p className="text-fg/80">{teoText}</p>}
+      {labText && <p className="text-fg/80">{labText}</p>}
+      <p className="text-fg/60 pt-1">{cargaText}</p>
     </div>
   )
 }
@@ -328,9 +314,9 @@ function BreakdownModal({ open, onClose, stats }: { open: boolean; onClose: () =
           >
             <div className="flex items-center justify-between p-5 border-b border-border">
               <div>
-                <h3 className="text-lg font-bold text-fg">Desglose de Ramos</h3>
+                <h3 className="text-lg font-bold text-fg">Desglose de Asignaturas</h3>
                 <p className="text-xs text-muted mt-0.5">
-                  {stats.uniqueCourses} asignaturas · {stats.teoCourses} con TEO · {stats.labCourses} con LAB
+                  {stats.uniqueCourses} asignaturas · {stats.totalClasesPorSemana} clases/semana ({stats.teoCourses} de Teoria + {stats.labCourses} de Laboratorio)
                 </p>
               </div>
               <button onClick={onClose} className="p-2 rounded-lg hover:bg-surface-hover transition-colors">
@@ -582,13 +568,12 @@ export default function UploadPage() {
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-bg-elevated border border-border cursor-help relative group"
                   onClick={() => setShowBreakdownModal(true)}
                 >
-                  {stats.uniqueCourses} Ramos detectados
+                  {stats.uniqueCourses} Asignaturas
                   <HelpCircle className="w-3.5 h-3.5 text-fg-muted" />
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-bg-elevated border border-border text-xs text-fg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
                     <div className="text-left space-y-0.5">
-                      <p><span className="font-semibold">Asignaturas:</span> {stats.uniqueCourses}</p>
-                      <p><span className="font-semibold">Secciones TEO:</span> {stats.teoCourses}</p>
-                      <p><span className="font-semibold">Secciones LAB:</span> {stats.labCourses}</p>
+                      <p>Debes tomar <span className="font-semibold">{stats.totalClasesPorSemana} clases/semana</span></p>
+                      <p>({stats.teoCourses} de Teoria + {stats.labCourses} de Laboratorio)</p>
                     </div>
                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-bg-elevated" />
                   </div>
@@ -655,7 +640,7 @@ export default function UploadPage() {
               <div className="p-4 border-t border-border">
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted">
-                    {stats.uniqueCourses} asignaturas · {stats.teoCourses} TEO · {stats.labCourses} LAB
+                    {stats.uniqueCourses} asignaturas · {stats.totalClasesPorSemana} clases/semana ({stats.teoCourses} Teoria + {stats.labCourses} Laboratorio)
                   </p>
                   <button
                     onClick={() => setShowBreakdownModal(true)}
