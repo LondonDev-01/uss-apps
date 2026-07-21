@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { useStore } from '../store'
 import ScheduleGrid, { getNrcColors, normTipo } from '../components/ScheduleGrid'
-import { ChevronLeft, ChevronRight, RotateCcw, Download, Sparkles, Calendar } from '../icons'
+import { ChevronLeft, ChevronRight, RotateCcw, Download, Sparkles, Calendar, Info, AlertCircle } from '../icons'
 import { useNavigate } from 'react-router-dom'
 
 export default function SchedulePage() {
@@ -28,6 +28,15 @@ export default function SchedulePage() {
   for (const h of horarioActual) {
     if (!(h.nrc in ramosVistos)) ramosVistos[h.nrc] = { titulo: h.titulo, tipo: h.tipo }
   }
+
+  const titulosEnHorario = new Set(Object.values(ramosVistos).map(r => r.titulo))
+  const excluidos = new Set<string>()
+  for (const h of store.horariosCrudos) {
+    if (h.prioridad > 0 && !titulosEnHorario.has(h.titulo)) {
+      excluidos.add(h.titulo)
+    }
+  }
+  const excluidosList = [...excluidos]
 
   const reiniciar = () => {
     if (confirm('¿Reiniciar todo y perder los datos?')) {
@@ -160,6 +169,44 @@ export default function SchedulePage() {
           </motion.button>
         </motion.div>
       </motion.div>
+
+      {excluidosList.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="flex items-start gap-3 p-4 rounded-2xl"
+          style={{
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.25)',
+          }}
+          role="alert"
+        >
+          <AlertCircle className="w-5 h-5 flex-shrink-0 text-warning mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-fg mb-1">
+              {excluidosList.length === 1 ? 'Ramo no incluido' : `${excluidosList.length} ramos no incluidos`}
+            </p>
+            <p className="text-xs text-muted mb-2">
+              Estos ramos no pudieron incluirse en ninguna combinacion sin conflictos:
+            </p>
+            <ul className="text-sm text-fg space-y-1">
+              {excluidosList.map((titulo, i) => (
+                <motion.li
+                  key={titulo}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 + 0.05 * i }}
+                  className="flex items-center gap-2"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-warning flex-shrink-0" />
+                  <span className="truncate">{titulo}</span>
+                </motion.li>
+              ))}
+            </ul>
+          </div>
+        </motion.div>
+      )}
     </motion.div>
   )
 }

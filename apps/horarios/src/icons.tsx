@@ -242,3 +242,8 @@ export const ClipboardList = createIcon('ClipboardList', [
   <line x1="9" y1="18" x2="17" y2="18" />,
   <line x1="9" y1="10" x2="17" y2="10" />,
 ])
+
+export const Clock = createIcon('Clock', [
+  <circle cx="12" cy="12" r="10" />,
+  <polyline points="12 6 12 12 16 14" />,
+])

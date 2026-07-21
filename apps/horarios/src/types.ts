@@ -44,12 +44,20 @@ export interface SeleccionUsuario {
   nrc_original: string
 }
 
+export type CriterioHorario = 'entrar_tarde' | 'salir_temprano' | 'sin_ventanas'
+
 export interface Preferencias {
-  entrar_tarde: boolean
-  salir_temprano: boolean
-  sin_ventanas: boolean
+  criterios: CriterioHorario[]
   sin_sabados: boolean
 }
+
+export const CRITERIO_LABELS: Record<CriterioHorario, { label: string; desc: string }> = {
+  entrar_tarde: { label: 'No entrar tan temprano', desc: 'Prefiere horarios que empiecen tarde' },
+  salir_temprano: { label: 'No salir tan tarde', desc: 'Prefiere horarios que terminen temprano' },
+  sin_ventanas: { label: 'Sin ventanas largas', desc: 'Prefiere horarios compactos, sin huecos largos' }
+}
+
+export const CRITERIO_ORDER: CriterioHorario[] = ['entrar_tarde', 'salir_temprano', 'sin_ventanas']
 
 export interface JsonStoreItem {
   curso: string
