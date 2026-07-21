@@ -360,6 +360,22 @@ export function generarTopHorarios(
 
   mejores.sort((a, b) => contarElectivos(b) - contarElectivos(a))
 
+  const conElectivos = mejores.filter(h => contarElectivos(h) > 0)
+  if (conElectivos.length > 0) {
+    mejores.length = 0
+    mejores.push(...conElectivos)
+  }
+  if (mejores.length === 0) {
+    for (const [, h] of validos) {
+      const signature = [...new Set(h.map(c => c.nrc))].sort().join('|')
+      if (!vistosSignatures.has(signature)) {
+        vistosSignatures.add(signature)
+        mejores.push(h)
+      }
+      if (mejores.length >= topN) break
+    }
+  }
+
   const titulosEnMejor = new Set<string>()
   for (const h of mejores) {
     for (const c of h) titulosEnMejor.add(c.titulo)
@@ -452,3 +468,24 @@ function calcularPuntaje(horario: ClaseConDia[], prefs: Preferencias): number {
 }
 
 export { verificarConflictos, calcularPuntaje }
+
+export function cumplePreferencias(horario: ClaseConDia[], prefs: Preferencias): boolean {
+  if (prefs.criterios.length === 0 && !prefs.sin_sabados) return true
+  const porDia: Record<string, ClaseConDia[]> = {}
+  for (const c of horario) (porDia[c.dia] ??= []).push(c)
+  for (const [dia, clases] of Object.entries(porDia)) {
+    if (dia === 'Sábado' && prefs.sin_sabados) return false
+    const ordenadas = [...clases].sort((a, b) => a.minutos_inicio - b.minutos_inicio)
+    const inicio = ordenadas[0].minutos_inicio
+    const fin = ordenadas[ordenadas.length - 1].minutos_fin
+    if (prefs.criterios.includes('entrar_tarde') && inicio < 660) return false
+    if (prefs.criterios.includes('salir_temprano') && fin > 900) return false
+    if (prefs.criterios.includes('sin_ventanas')) {
+      for (let i = 0; i < ordenadas.length - 1; i++) {
+        const gap = ordenadas[i + 1].minutos_inicio - ordenadas[i].minutos_fin
+        if (gap > 20) return false
+      }
+    }
+  }
+  return true
+}

@@ -3,7 +3,8 @@ import { useMemo } from 'react'
 import { useStore } from '../store'
 import ScheduleGrid, { getNrcColors } from '../components/ScheduleGrid'
 import { getCourseColors, normTipo } from '../lib/colors'
-import { ChevronLeft, ChevronRight, RotateCcw, Download, Sparkles, Calendar, AlertCircle } from '../icons'
+import { cumplePreferencias } from '../lib/optimizer'
+import { ChevronLeft, ChevronRight, RotateCcw, Download, Sparkles, Calendar, AlertCircle, CheckCircle, Info } from '../icons'
 import { useNavigate } from 'react-router-dom'
 import { ClaseConDia, ExcluidoInfo } from '../types'
 
@@ -27,6 +28,8 @@ export default function SchedulePage() {
   const horarioActual = store.mejoresHorarios[store.indiceHorario]
   const nrcColors = getNrcColors(horarioActual)
   const courseColors = getCourseColors(horarioActual)
+  const tienePreferencias = store.preferencias.criterios.length > 0 || store.preferencias.sin_sabados
+  const cumplePrefs = tienePreferencias ? cumplePreferencias(horarioActual, store.preferencias) : true
 
   const ramosVistos: Record<string, { titulo: string; tipo: string; clases: ClaseConDia[] }> = {}
   for (const h of horarioActual) {
@@ -87,10 +90,30 @@ export default function SchedulePage() {
       >
         <div>
           <h2 className="text-2xl font-bold text-fg">Tu Horario Optimizado</h2>
-          <p className="text-muted mt-1">
-            Opción <strong className="text-fg">{store.indiceHorario + 1}</strong> de{' '}
-            <strong className="text-fg">{store.mejoresHorarios.length}</strong> alternativas
-          </p>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            <p className="text-muted">
+              Opción <strong className="text-fg">{store.indiceHorario + 1}</strong> de{' '}
+              <strong className="text-fg">{store.mejoresHorarios.length}</strong> alternativas
+            </p>
+            {tienePreferencias && (
+              <span
+                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+                  cumplePrefs
+                    ? 'bg-success/10 text-success border border-success/20'
+                    : 'bg-muted/10 text-muted border border-muted/20'
+                }`}
+                title={cumplePrefs
+                  ? 'Este horario cumple con todas tus preferencias'
+                  : 'Ya no hay más variaciones que cumplan con todas las preferencias solicitadas'}
+              >
+                {cumplePrefs ? (
+                  <><CheckCircle className="w-3.5 h-3.5" /> Toma en cuenta preferencia</>
+                ) : (
+                  <><Info className="w-3.5 h-3.5" /> No toma en cuenta preferencia</>
+                )}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <motion.button
