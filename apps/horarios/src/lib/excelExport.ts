@@ -94,7 +94,7 @@ export function generarExcelColoreado(horario: ClaseConDia[]): string {
         const cellStyle = `background:${color};border:1px solid #1E293B;color:#1E293B;padding:6px;font-family:Arial,sans-serif;font-size:9pt;vertical-align:middle;text-align:center;width:140px;height:60px;`
         const titulo = escapeHtml(c.titulo)
         const seccion = escapeHtml(c.seccion ?? '')
-        table += `<td style="${cellStyle}"><b style="font-size:10pt;">${titulo}</b><br><span style="font-size:8pt;">${c.tipo} ${seccion}</span><br><span style="font-size:8pt;">NRC ${c.nrc}</span><br><span style="font-size:9pt;font-weight:bold;">${c.hora_inicio}-${c.hora_fin}</span>${lugarFinal ? `<br><span style="font-size:7pt;">${escapeHtml(lugarFinal)}</span>` : ''}</td>`
+        table += `<td bgcolor="${color}" style="${cellStyle}"><b style="font-size:10pt;">${titulo}</b><br><span style="font-size:8pt;">${c.tipo} ${seccion}</span><br><span style="font-size:8pt;">NRC ${c.nrc}</span><br><span style="font-size:9pt;font-weight:bold;">${c.hora_inicio}-${c.hora_fin}</span>${lugarFinal ? `<br><span style="font-size:7pt;">${escapeHtml(lugarFinal)}</span>` : ''}</td>`
       }
     }
     table += '</tr>'
@@ -130,7 +130,7 @@ export function generarExcelColoreado(horario: ClaseConDia[]): string {
     })
     const detalle = ordenadas.map(c => `${c.dia.substring(0, 3)} ${c.hora_inicio}-${c.hora_fin}`).join(' / ')
     legendTable += '<tr>'
-    legendTable += `<td style="${cellStyle}">&nbsp;</td>`
+    legendTable += `<td bgcolor="${color}" style="${cellStyle}">&nbsp;</td>`
     legendTable += `<td style="${dataStyle}"><b>${escapeHtml(item.titulo)}</b></td>`
     legendTable += `<td style="${dataStyle}text-align:center;">${escapeHtml(item.tipo)}</td>`
     legendTable += `<td style="${dataStyle}text-align:center;font-family:monospace;">${escapeHtml(item.nrc)}</td>`
