@@ -1,23 +1,9 @@
 import { motion } from 'framer-motion'
 import { ClaseConDia } from '../types'
+import { getNrcColors, normTipo } from '../lib/colors'
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const SLOTS = ['08:00', '09:30', '11:00', '12:30', '13:11', '14:40', '16:00', '17:35', '19:00']
-
-const COLORES = ['#BFDBFE', '#BBF7D0', '#FEF3C7', '#FECACA', '#DDD6FE', '#F5D0FE', '#FED7AA', '#E9D5FF']
-
-function hexToRgb(h: string): [number, number, number] {
-  const s = h.replace('#', '')
-  return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)]
-}
-
-function adjustBrightness(hex: string, factor: number): string {
-  const [r, g, b] = hexToRgb(hex)
-  const nr = Math.max(0, Math.min(255, Math.floor(r * factor)))
-  const ng = Math.max(0, Math.min(255, Math.floor(g * factor)))
-  const nb = Math.max(0, Math.min(255, Math.floor(b * factor)))
-  return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`
-}
 
 function hhmmToMin(s: string): number {
   try {
@@ -26,32 +12,7 @@ function hhmmToMin(s: string): number {
   } catch { return 0 }
 }
 
-export function normTipo(tipo: string): 'TEO' | 'LAB' | 'OTRO' {
-  const up = (tipo || '').toUpperCase()
-  if (up.includes('TEOR') || up.includes('TEO')) return 'TEO'
-  if (up.includes('LAB') || up.includes('TALLER') || up.includes('PRACT')) return 'LAB'
-  return 'OTRO'
-}
-
-export function getNrcColors(horario: ClaseConDia[]): Record<string, string> {
-  const titleBase: Record<string, string> = {}
-  const nrcColors: Record<string, string> = {}
-  for (const h of horario) {
-    if (!(h.titulo in titleBase)) {
-      titleBase[h.titulo] = COLORES[Object.keys(titleBase).length % COLORES.length]
-    }
-  }
-  for (const h of horario) {
-    if (!(h.nrc in nrcColors)) {
-      const base = titleBase[h.titulo] ?? COLORES[0]
-      const t = normTipo(h.tipo)
-      if (t === 'TEO') nrcColors[h.nrc] = adjustBrightness(base, 1.15)
-      else if (t === 'LAB') nrcColors[h.nrc] = adjustBrightness(base, 0.85)
-      else nrcColors[h.nrc] = base
-    }
-  }
-  return nrcColors
-}
+export { normTipo, getNrcColors }
 
 interface Props {
   horario: ClaseConDia[]
