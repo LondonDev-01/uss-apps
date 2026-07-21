@@ -9,7 +9,7 @@ import { ChevronDown, AlertTriangle, CheckCircle, Target, Flag, Star, Sparkles, 
 const PRIORIDADES = [
   { value: 0, label: 'Prioridad', desc: 'Ramos obligatorios que DEBEN estar en el horario', icon: Target, color: 'var(--color-cat-0)', bg: 'var(--color-cat-0-light)' },
   { value: 1, label: 'Opcionales', desc: 'Ramos que quieres adelantar si hay espacio', icon: Flag, color: 'var(--color-cat-1)', bg: 'var(--color-cat-1-light)' },
-  { value: 2, label: 'Electivos', desc: 'Elige SOLO uno de estos ramos', icon: Star, color: 'var(--color-cat-2)', bg: 'var(--color-cat-2-light)' },
+  { value: 2, label: 'Electivos', desc: 'Ramos que quieres incluir (se intentara al menos 1)', icon: Star, color: 'var(--color-cat-2)', bg: 'var(--color-cat-2-light)' },
 ] as const
 
 export default function CategorizePage() {
@@ -39,23 +39,25 @@ export default function CategorizePage() {
     prioridadesPorNrc[nrc] = horarios[0].prioridad
   }
 
-  const electivoCount = Object.values(prioridadesPorNrc).filter(p => p === 2).length
+  const electivoCount = new Set(
+    nrcs.filter(n => prioridadesPorNrc[n] === 2)
+        .map(n => agrupados[n][0].titulo)
+  ).size
 
   const toggleExpand = (nrc: string) => {
     setExpanded((prev: Record<string, boolean>) => ({ ...prev, [nrc]: !prev[nrc] }))
   }
 
   const handlePriorityChange = (nrc: string, value: number) => {
+    const target = agrupados[nrc]?.[0]
+    if (!target) return
+    const titulo = target.titulo
     store.setHorariosCrudos(
-      store.horariosCrudos.map(h => h.nrc === nrc ? { ...h, prioridad: value } : h)
+      store.horariosCrudos.map(h => h.titulo === titulo ? { ...h, prioridad: value } : h)
     )
   }
 
   const handleProceed = async () => {
-    if (electivoCount > 1) {
-      store.showToast('Solo puedes elegir UN electivo')
-      return
-    }
     navigate('/process')
   }
 
@@ -78,7 +80,7 @@ export default function CategorizePage() {
             Asigna cada ramo a una categoría.{' '}
             <span className="text-fg font-medium">Prioridad</span>,{' '}
             <span className="text-fg font-medium">Opcionales</span>, o{' '}
-            <span className="text-fg font-medium">Electivos</span> (solo uno).
+            <span className="text-fg font-medium">Electivos</span>.
           </p>
         </div>
         <button onClick={() => setShowHelp(true)} className="btn-ghost p-2 self-start">
@@ -115,15 +117,15 @@ export default function CategorizePage() {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-3 p-4 rounded-xl"
           style={{
-            background: 'rgba(251, 191, 36, 0.1)',
-            border: '1px solid rgba(251, 191, 36, 0.3)',
-            color: 'var(--color-warning)',
+            background: 'rgba(59, 130, 246, 0.08)',
+            border: '1px solid rgba(59, 130, 246, 0.2)',
+            color: 'var(--color-primary)',
           }}
           role="alert"
         >
-          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <Sparkles className="w-5 h-5 flex-shrink-0" />
           <p className="text-sm font-medium">
-            Solo puedes elegir <strong>UN electivo</strong>. Actualmente tienes {electivoCount} seleccionados.
+            Tienes <strong>{electivoCount} electivos</strong> seleccionados. El sistema intentara incluir tantos como sea posible.
           </p>
         </motion.div>
       )}
@@ -257,12 +259,11 @@ export default function CategorizePage() {
         })}
       </motion.div>
 
-      <motion.button
-        onClick={handleProceed}
-        disabled={electivoCount > 1}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
-        className="btn-primary w-full py-4 text-lg font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+        <motion.button
+          onClick={handleProceed}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          className="btn-primary w-full py-4 text-lg font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Sparkles className="w-5 h-5 mr-2" />
         Continuar: Asignar días
