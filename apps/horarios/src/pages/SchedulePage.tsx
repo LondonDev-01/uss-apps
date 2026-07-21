@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion'
+import { useMemo } from 'react'
 import { useStore } from '../store'
 import ScheduleGrid, { getNrcColors } from '../components/ScheduleGrid'
 import { getCourseColors, normTipo } from '../lib/colors'
 import { ChevronLeft, ChevronRight, RotateCcw, Download, Sparkles, Calendar, AlertCircle } from '../icons'
 import { useNavigate } from 'react-router-dom'
-import { ClaseConDia } from '../types'
+import { ClaseConDia, ExcluidoInfo } from '../types'
 
 export default function SchedulePage() {
   const store = useStore()
@@ -33,20 +34,36 @@ export default function SchedulePage() {
     ramosVistos[h.nrc].clases.push(h)
   }
 
-  const titulosEnHorario = new Set(Object.values(ramosVistos).map(r => r.titulo))
-  const excluidosDetallados = store.excluidosDetallados.length > 0
-    ? store.excluidosDetallados.filter(e => !titulosEnHorario.has(e.titulo))
-    : (() => {
-        const excluidos: { titulo: string; conflictos: string[] }[] = []
-        for (const h of store.horariosCrudos) {
-          if (h.prioridad > 0 && !titulosEnHorario.has(h.titulo)) {
-            if (!excluidos.some(e => e.titulo === h.titulo)) {
-              excluidos.push({ titulo: h.titulo, conflictos: [] })
-            }
-          }
+  const titulosEnHorario = new Set(horarioActual.map(c => c.titulo))
+
+  const excluidosDetallados = useMemo(() => {
+    const titulosVistos = new Set<string>()
+    const excluidos: ExcluidoInfo[] = []
+    for (const h of store.horariosCrudos) {
+      if (h.prioridad <= 0 || titulosEnHorario.has(h.titulo) || titulosVistos.has(h.titulo)) continue
+      titulosVistos.add(h.titulo)
+      const conflictos: string[] = []
+      const mmToHHMM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+      const parseHHMM = (s: string) => { const [hh,mm] = s.split(':').map(Number); return hh*60+mm }
+      const [hIni, hFin] = h.hora_str.split(' - ')
+      const dia = h.dia_parseado
+      if (!dia) continue
+      const mIni = parseHHMM(hIni)
+      const mFin = parseHHMM(hFin)
+      for (const clase of horarioActual) {
+        if (clase.dia !== dia) continue
+        if (clase.minutos_inicio < mFin && clase.minutos_fin > mIni) {
+          const msg = `${clase.titulo} (${clase.dia} ${clase.hora_inicio}-${clase.hora_fin})`
+          if (!conflictos.includes(msg)) conflictos.push(msg)
         }
-        return excluidos
-      })()
+      }
+      if (conflictos.length === 0) {
+        conflictos.push('Sin cupos disponibles o sin combinación válida')
+      }
+      excluidos.push({ titulo: h.titulo, conflictos })
+    }
+    return excluidos
+  }, [horarioActual, store.horariosCrudos, titulosEnHorario])
 
   const reiniciar = () => {
     if (confirm('¿Reiniciar todo y perder los datos?')) {

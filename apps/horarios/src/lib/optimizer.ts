@@ -293,7 +293,11 @@ export function generarTopHorarios(
     if (valido) {
       const nNrcs = new Set(plano.map(c => c.nrc)).size
       const gap = calcTeoLabGap(plano)
-      const puntaje = calcularPuntaje(plano, preferencias) + (nNrcs * 500) - (gap / 5)
+      const nElectivos = plano.filter(c => c.prioridad === 2).length
+      const titulosElectivos = new Set(plano.filter(c => c.prioridad === 2).map(c => c.titulo))
+      const nTitulosElectivos = titulosElectivos.size
+      const bonusElectivo = nTitulosElectivos * 2000
+      const puntaje = calcularPuntaje(plano, preferencias) + (nNrcs * 500) - (gap / 5) + bonusElectivo
       validos.push([puntaje, plano])
     } else {
       conflictos[msg] = (conflictos[msg] ?? 0) + 1
@@ -315,21 +319,29 @@ export function generarTopHorarios(
   const vistosSignatures = new Set<string>()
   const vistosLayouts: Set<string>[] = []
 
+  const contarElectivos = (h: ClaseConDia[]) => {
+    const t = new Set(h.filter(c => c.prioridad === 2).map(c => c.titulo))
+    return t.size
+  }
+
+  const layoutCore = (h: ClaseConDia[]) =>
+    new Set(h.filter(c => c.prioridad !== 2).map(c => `${c.dia}|${c.hora_inicio}|${c.hora_fin}`))
+
   for (const [, h] of validos) {
     const signature = [...new Set(h.map(c => c.nrc))].sort().join('|')
     if (vistosSignatures.has(signature)) continue
 
-    const layoutActual = new Set(h.map(c => `${c.dia}|${c.hora_inicio}|${c.hora_fin}`))
+    const coreActual = layoutCore(h)
     let similar = false
     for (const layoutPrevio of vistosLayouts) {
       let inter = 0
-      for (const l of layoutActual) if (layoutPrevio.has(l)) inter++
-      if (inter / layoutActual.size > 0.80) { similar = true; break }
+      for (const l of coreActual) if (layoutPrevio.has(l)) inter++
+      if (inter > 0 && inter / coreActual.size > 0.90) { similar = true; break }
     }
 
     if (!similar) {
       vistosSignatures.add(signature)
-      vistosLayouts.push(layoutActual)
+      vistosLayouts.push(coreActual)
       mejores.push(h)
     }
     if (mejores.length >= topN) break
@@ -345,6 +357,8 @@ export function generarTopHorarios(
       if (mejores.length >= topN) break
     }
   }
+
+  mejores.sort((a, b) => contarElectivos(b) - contarElectivos(a))
 
   const titulosEnMejor = new Set<string>()
   for (const h of mejores) {
