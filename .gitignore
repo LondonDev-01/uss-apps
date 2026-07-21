@@ -1,28 +1,8 @@
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-venv/
-ENV/
-env/
-.env
-dist/
-*.xlsx
-*.json
-.streamlit/
-.idea/
-.vscode/
-*.log
-
-# Local device id used by dev environment
-.device_id
-usuarios.db
-# Local admin seed (do NOT commit credentials)
-.admin_seed
-
-# Build artifacts and packaging specs
-*.spec
-build/
-
-# Node / frontend (if present)
 node_modules/
+dist/
+.vercel/
+*.log
+.DS_Store
+.env
+.env.local
+.vite/

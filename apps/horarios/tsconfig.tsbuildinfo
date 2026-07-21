@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/icons.tsx","./src/main.tsx","./src/store.tsx","./src/types.ts","./src/components/ScheduleGrid.tsx","./src/lib/excelParser.ts","./src/lib/optimizer.ts","./src/lib/parser.ts","./src/pages/CategorizePage.tsx","./src/pages/ExportPage.tsx","./src/pages/ProcessPage.tsx","./src/pages/SchedulePage.tsx","./src/pages/UploadPage.tsx"],"version":"5.7.3"}

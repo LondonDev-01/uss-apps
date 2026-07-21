@@ -1,7 +1,0 @@
-name: create-admin (REMOVED)
-
-# This workflow was intentionally removed. Admin creation and local admin
-# automation was removed from the repository on request. Use the Neon
-# console or direct DB access instead.
-
-on: {}
