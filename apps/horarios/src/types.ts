@@ -86,3 +86,15 @@ export const PRIORIDAD_COLORS: Record<Prioridad, { bg: string; border: string; t
 }
 
 export const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+export interface ExcluidoInfo {
+  titulo: string
+  conflictos: string[]
+}
+
+export interface ResultadoOptimizacion {
+  horarios: ClaseConDia[][]
+  mensaje: string
+  excluidos: string[]
+  excluidosDetallados: ExcluidoInfo[]
+}
