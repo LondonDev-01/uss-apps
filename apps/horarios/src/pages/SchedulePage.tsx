@@ -94,6 +94,9 @@ export default function SchedulePage() {
             <p className="text-muted">
               Opción <strong className="text-fg">{store.indiceHorario + 1}</strong> de{' '}
               <strong className="text-fg">{store.mejoresHorarios.length}</strong> alternativas
+              <span className="ml-2 text-muted">
+                ({horarioActual.length} {horarioActual.length === 1 ? 'clase' : 'clases'} semanales)
+              </span>
             </p>
             {tienePreferencias && (
               <span
