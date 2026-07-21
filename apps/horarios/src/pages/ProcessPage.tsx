@@ -79,7 +79,7 @@ export default function ProcessPage() {
         prioridadesPorNrc[h.nrc] = h.prioridad
       }
       const candidatos = procesarSeleccionesUsuario(store.selecciones, prioridadesPorNrc)
-      const resultado = generarTopHorarios(candidatos, 20, store.preferencias)
+      const resultado = generarTopHorarios(candidatos, 10, store.preferencias)
       if (resultado.horarios.length === 0) {
         alert(resultado.mensaje)
         return

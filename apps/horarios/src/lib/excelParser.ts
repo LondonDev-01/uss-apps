@@ -104,9 +104,8 @@ export function parseExcelToHorarioCrudo(data: unknown[][]): HorarioCrudo[] {
     if (!nrc || !titulo) continue
     
     const tipoRaw = String(row[componenteIdx] || '').trim().toUpperCase()
-    const tipo = tipoRaw.includes('TEO') ? 'TEO' 
-      : tipoRaw.includes('LAB') ? 'LAB' 
-      : tipoRaw.includes('TALLER') ? 'TALLER' 
+    const tipo = tipoRaw.includes('TEO') ? 'TEO'
+      : tipoRaw.includes('LAB') || tipoRaw.includes('TALLER') || tipoRaw === 'TAL' ? 'LAB'
       : tipoRaw || 'TEO'
     
     const seccion = String(row[seccionIdx] || '').trim()
