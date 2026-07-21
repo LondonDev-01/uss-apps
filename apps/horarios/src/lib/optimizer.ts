@@ -72,10 +72,25 @@ function evaluarDia(clases: ClaseConDia[], prefs: Preferencias): number {
   let score = 0
   const inicio = clases[0].minutos_inicio
   const fin = clases[clases.length - 1].minutos_fin
+  const ventanas = calcularVentanas(clases)
 
-  if (prefs.entrar_tarde && inicio < 660) score += (inicio - 480)
-  if (prefs.salir_temprano && fin > 900) score -= (fin - 900) * 2
-  if (prefs.sin_ventanas) score -= calcularVentanas(clases) * 3
+  const ponderacion = (pos: number): number => {
+    if (prefs.criterios.length === 0) return 1
+    const pesoBase = prefs.criterios.length === 1 ? 3 : 1
+    return prefs.criterios[pos] !== undefined ? pesoBase : 0
+  }
+
+  const criteriosSet = new Set(prefs.criterios)
+
+  if (criteriosSet.has('entrar_tarde')) {
+    if (inicio < 660) score += (inicio - 480) * ponderacion(prefs.criterios.indexOf('entrar_tarde'))
+  }
+  if (criteriosSet.has('salir_temprano')) {
+    if (fin > 900) score -= (fin - 900) * 2 * ponderacion(prefs.criterios.indexOf('salir_temprano'))
+  }
+  if (criteriosSet.has('sin_ventanas')) {
+    if (ventanas > 0) score -= ventanas * 3 * ponderacion(prefs.criterios.indexOf('sin_ventanas'))
+  }
   return score
 }
 
@@ -171,8 +186,7 @@ export function generarTopHorarios(
   candidatos: ClaseConDia[],
   topN = 20,
   preferencias: Preferencias
-): [ClaseConDia[][], string] {
-  // Dedup by title - keep highest priority (lowest number)
+): { horarios: ClaseConDia[][]; mensaje: string; excluidos: string[] } {
   const prioridadPorTitulo: Record<string, number> = {}
   for (const c of candidatos) {
     if (!(c.titulo in prioridadPorTitulo) || c.prioridad < prioridadPorTitulo[c.titulo]) {
@@ -180,7 +194,6 @@ export function generarTopHorarios(
     }
   }
 
-  // Group by (title, nrc)
   const blocksList: Record<string, ClaseConDia[]> = {}
   for (const c of candidatos) {
     if (c.prioridad === prioridadPorTitulo[c.titulo]) {
@@ -189,7 +202,6 @@ export function generarTopHorarios(
     }
   }
 
-  // Group by priority and type
   const ramosPorPrioridad: Record<number, Record<string, Record<string, ClaseConDia[][]>>> = {
     0: {}, 1: {}, 2: {}
   }
@@ -201,9 +213,26 @@ export function generarTopHorarios(
     ;(ramosPorPrioridad[p][base.titulo][tipoNorm] ??= []).push(blocks)
   }
 
-  const [opts0] = consolidarOpciones(ramosPorPrioridad[0] ?? {})
-  const [opts1] = consolidarOpciones(ramosPorPrioridad[1] ?? {})
-  const [opts2] = consolidarOpciones(ramosPorPrioridad[2] ?? {})
+  const [opts0, nombres0] = consolidarOpciones(ramosPorPrioridad[0] ?? {})
+  const [opts1, nombres1] = consolidarOpciones(ramosPorPrioridad[1] ?? {})
+  const [opts2, nombres2] = consolidarOpciones(ramosPorPrioridad[2] ?? {})
+
+  if (ramosPorPrioridad[0] && Object.keys(ramosPorPrioridad[0]).length > 0) {
+    const cursosP0 = Object.keys(ramosPorPrioridad[0])
+    const cursosSinOpciones = cursosP0.filter(t => !nombres0.includes(t))
+    if (cursosSinOpciones.length > 0) {
+      const detalle = cursosSinOpciones.map(t => {
+        const tieneTEO = !!ramosPorPrioridad[0][t].TEO
+        const tieneLAB = !!ramosPorPrioridad[0][t].LAB
+        return `• ${t}${tieneTEO && tieneLAB ? ' (sin combinación válida de TEO+LAB)' : ' (sin bloques asignados)'})`
+      }).join('\n')
+      return {
+        horarios: [],
+        mensaje: `Ramos prioritarios sin combinación válida:\n${detalle}\n\nQuítalo de Prioridad o cámbialo de NRC.`,
+        excluidos: []
+      }
+    }
+  }
 
   const todasOptsElectivos: OpcionRamo[] = []
   for (const o of opts2) todasOptsElectivos.push(...o)
@@ -216,7 +245,17 @@ export function generarTopHorarios(
   let total = 1
   for (const op of listaFinal) total *= op.length
   const LIMITE = 5_000_000
-  if (total > LIMITE) return [[], `Demasiadas combinaciones (${total.toLocaleString()}). Reduce ramos opcionales.`]
+  if (total > LIMITE) {
+    return {
+      horarios: [],
+      mensaje: `Demasiadas combinaciones (${total.toLocaleString()}). Reduce ramos opcionales.`,
+      excluidos: []
+    }
+  }
+
+  const titlesP0Set = new Set(nombres0)
+  const titlesP1Set = new Set(nombres1)
+  const titlesP2Set = new Set(nombres2)
 
   const validos: [number, ClaseConDia[]][] = []
   const conflictos: Record<string, number> = {}
@@ -227,6 +266,13 @@ export function generarTopHorarios(
       if (Array.isArray(blocks) && blocks.length > 0) plano.push(...blocks)
     }
     if (plano.length === 0) continue
+
+    const titlesEnPlano = new Set(plano.map(c => c.titulo))
+    let incluyeTodoP0 = true
+    for (const t of titlesP0Set) {
+      if (!titlesEnPlano.has(t)) { incluyeTodoP0 = false; break }
+    }
+    if (!incluyeTodoP0) continue
 
     const [valido, msg] = verificarConflictos(plano)
     if (valido) {
@@ -245,7 +291,7 @@ export function generarTopHorarios(
       const tops = Object.entries(conflictos).sort((a, b) => b[1] - a[1]).slice(0, 3)
       msg += '\n\nConflictos más frecuentes:\n' + tops.map(([c, n]) => `• ${c} (${n})`).join('\n')
     }
-    return [[], msg]
+    return { horarios: [], mensaje: msg, excluidos: [] }
   }
 
   validos.sort((a, b) => b[0] - a[0])
@@ -285,7 +331,19 @@ export function generarTopHorarios(
     }
   }
 
-  return [mejores, `¡Éxito! ${validos.length} opciones encontradas (${mejores.length} diversas).`]
+  const titulosEnMejor = new Set<string>()
+  for (const h of mejores) {
+    for (const c of h) titulosEnMejor.add(c.titulo)
+  }
+  const excluidos: string[] = []
+  for (const t of nombres1) if (!titulosEnMejor.has(t)) excluidos.push(t)
+  for (const t of nombres2) if (!titulosEnMejor.has(t)) excluidos.push(t)
+
+  return {
+    horarios: mejores,
+    mensaje: `¡Éxito! ${validos.length} opciones encontradas (${mejores.length} diversas).`,
+    excluidos
+  }
 }
 
 function calcularPuntaje(horario: ClaseConDia[], prefs: Preferencias): number {

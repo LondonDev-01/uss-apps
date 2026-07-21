@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { HorarioCrudo, ClaseConDia, SeleccionUsuario, Preferencias, JsonStoreItem, Prioridad } from './types'
+import { HorarioCrudo, ClaseConDia, SeleccionUsuario, Preferencias, CriterioHorario, JsonStoreItem, Prioridad } from './types'
 
 interface Store {
   // Raw data
@@ -29,6 +29,7 @@ interface Store {
   preferencias: Preferencias
   setPreferencia: (k: keyof Preferencias, v: boolean) => void
   setPreferencias: (p: Preferencias) => void
+  setCriterios: (c: CriterioHorario[]) => void
   
   // UI state
   activeTab: number
@@ -44,9 +45,7 @@ interface Store {
 }
 
 const PREF_INIT: Preferencias = {
-  entrar_tarde: true,
-  salir_temprano: true,
-  sin_ventanas: true,
+  criterios: ['entrar_tarde', 'sin_ventanas'],
   sin_sabados: true
 }
 
@@ -120,6 +119,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       mejoresHorarios, setMejoresHorarios, indiceHorario, setIndiceHorario,
       jsonStore, setJsonStore,
       preferencias, setPreferencia: (k, v) => setPreferencias(p => ({ ...p, [k]: v })), setPreferencias,
+      setCriterios: (c) => setPreferencias(p => ({ ...p, criterios: c })),
       activeTab, setActiveTab,
       toast, showToast, clearToast,
       resetAll

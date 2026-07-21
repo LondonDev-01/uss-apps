@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../store'
 import { agruparPorNrc } from '../lib/parser'
 import { procesarSeleccionesUsuario, generarTopHorarios } from '../lib/optimizer'
-import { ChevronRight, Trash2, AlertTriangle, CheckCircle, Loader2, HelpCircle } from '../icons'
+import { ChevronRight, Trash2, AlertTriangle, Loader2, Sparkles, Sun, Moon, Clock } from '../icons'
 import { useNavigate } from 'react-router-dom'
+import { CRITERIO_LABELS, CRITERIO_ORDER, CriterioHorario } from '../types'
 
 const DIAS_OPCIONES = ['Seleccionar', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
@@ -78,12 +79,12 @@ export default function ProcessPage() {
         prioridadesPorNrc[h.nrc] = h.prioridad
       }
       const candidatos = procesarSeleccionesUsuario(store.selecciones, prioridadesPorNrc)
-      const [mejores, msg] = generarTopHorarios(candidatos, 20, store.preferencias)
-      if (mejores.length === 0) {
-        alert(msg)
+      const resultado = generarTopHorarios(candidatos, 20, store.preferencias)
+      if (resultado.horarios.length === 0) {
+        alert(resultado.mensaje)
         return
       }
-      store.setMejoresHorarios(mejores)
+      store.setMejoresHorarios(resultado.horarios)
       store.setIndiceHorario(0)
       store.showToast('¡Horarios generados!')
       navigate('/schedule')
@@ -92,6 +93,19 @@ export default function ProcessPage() {
       store.showToast('Error al optimizar')
     } finally {
       setOptimizing(false)
+    }
+  }
+
+  const toggleCriterio = (c: CriterioHorario) => {
+    const current = store.preferencias.criterios
+    if (current.includes(c)) {
+      store.setCriterios(current.filter(x => x !== c))
+    } else {
+      if (current.length >= 2) {
+        store.showToast('Máximo 2 criterios. Quita uno para añadir otro.')
+        return
+      }
+      store.setCriterios([...current, c])
     }
   }
 
@@ -113,6 +127,79 @@ export default function ProcessPage() {
           <p className="text-muted mt-1">
             El optimizador elegirá la mejor combinación automáticamente según tus preferencias.
           </p>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.13 }}
+        className="card rounded-2xl p-5 border border-border"
+      >
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold text-fg">¿Cómo quieres tu horario ideal?</h3>
+          </div>
+          <span className="text-xs text-muted">
+            Elige hasta 2 criterios ({store.preferencias.criterios.length}/2)
+          </span>
+        </div>
+        <p className="text-xs text-muted mb-4">
+          El primer criterio que marques tendra mayor peso. Si eliges los 2, ambos tendran el mismo peso.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {CRITERIO_ORDER.map((key, idx) => {
+            const meta = CRITERIO_LABELS[key]
+            const selected = store.preferencias.criterios.includes(key)
+            const orden = store.preferencias.criterios.indexOf(key)
+            const Icon = key === 'entrar_tarde' ? Sun : key === 'salir_temprano' ? Moon : Clock
+            return (
+              <motion.button
+                key={key}
+                onClick={() => toggleCriterio(key)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`relative p-4 rounded-xl border text-left transition-all ${
+                  selected
+                    ? 'shadow-md'
+                    : 'border-border bg-bg-elevated/30 hover:border-primary/30'
+                }`}
+                style={selected ? {
+                  borderColor: 'var(--color-primary)',
+                  background: 'color-mix(in srgb, var(--color-primary) 10%, var(--color-bg-elevated))',
+                  boxShadow: '0 0 0 1px var(--color-primary), 0 4px 20px -8px var(--color-primary)',
+                } : undefined}
+                aria-pressed={selected}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background: selected ? 'var(--color-primary)' : 'var(--color-bg-elevated)',
+                      color: selected ? 'var(--color-bg)' : 'var(--color-muted)'
+                    }}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-fg text-sm">{meta.label}</p>
+                    <p className="text-xs text-muted mt-0.5">{meta.desc}</p>
+                  </div>
+                </div>
+                {selected && orden >= 0 && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold"
+                    style={{ background: 'var(--color-primary)', color: 'var(--color-bg)' }}
+                  >
+                    {orden === 0 ? '1°' : '2°'}
+                  </motion.div>
+                )}
+              </motion.button>
+            )
+          })}
         </div>
       </motion.div>
 

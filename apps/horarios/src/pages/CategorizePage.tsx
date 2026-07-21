@@ -3,8 +3,8 @@ import { useState } from 'react'
 import { useStore } from '../store'
 import { useNavigate } from 'react-router-dom'
 import { agruparPorNrc } from '../lib/parser'
-import { procesarSeleccionesUsuario, generarTopHorarios } from '../lib/optimizer'
-import { ChevronDown, AlertTriangle, CheckCircle, Target, Flag, Star, Sparkles, X, HelpCircle } from '../icons'
+import { ChevronDown, AlertTriangle, CheckCircle, Target, Flag, Star, Sparkles, X, HelpCircle, Trash2 } from '../icons'
+import { SeleccionUsuario } from '../types'
 
 const PRIORIDADES = [
   { value: 0, label: 'Prioridad', desc: 'Ramos obligatorios que DEBEN estar en el horario', icon: Target, color: 'var(--color-cat-0)', bg: 'var(--color-cat-0-light)' },
@@ -55,6 +55,29 @@ export default function CategorizePage() {
     store.setHorariosCrudos(
       store.horariosCrudos.map(h => h.titulo === titulo ? { ...h, prioridad: value } : h)
     )
+  }
+
+  const handleRemoveCourse = (nrc: string) => {
+    const target = agrupados[nrc]?.[0]
+    if (!target) return
+    const titulo = target.titulo
+    const totalNrcs = new Set(
+      store.horariosCrudos.filter(h => h.titulo === titulo).map(h => h.nrc)
+    ).size
+    const msg = totalNrcs > 1
+      ? `¿Quitar "${titulo}" y todos sus ${totalNrcs} NRCs?`
+      : `¿Quitar "${titulo}"?`
+    if (!confirm(msg)) return
+    const nrcsAEliminar = new Set(
+      store.horariosCrudos.filter(h => h.titulo === titulo).map(h => h.nrc)
+    )
+    store.setHorariosCrudos(store.horariosCrudos.filter(h => h.titulo !== titulo))
+    const nuevasSel: Record<string, SeleccionUsuario> = {}
+    for (const [k, v] of Object.entries(store.selecciones)) {
+      if (!nrcsAEliminar.has(v.nrc_original)) nuevasSel[k] = v
+    }
+    store.setSelecciones(nuevasSel)
+    store.showToast(`"${titulo}" eliminado`)
   }
 
   const handleProceed = async () => {
@@ -195,6 +218,17 @@ export default function CategorizePage() {
                   </div>
                 </div>
               </button>
+
+              <motion.button
+                onClick={(e) => { e.stopPropagation(); handleRemoveCourse(nrc) }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="absolute top-3 right-3 p-2 rounded-lg text-muted hover:text-danger hover:bg-danger/10 transition-colors z-10"
+                aria-label={`Quitar ${h.titulo} de la lista`}
+                title="Quitar este ramo"
+              >
+                <Trash2 className="w-4 h-4" />
+              </motion.button>
 
               <AnimatePresence>
                 {isOpen && (
