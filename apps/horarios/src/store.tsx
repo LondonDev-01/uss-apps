@@ -47,8 +47,8 @@ interface Store {
 }
 
 const PREF_INIT: Preferencias = {
-  criterios: ['entrar_tarde', 'sin_ventanas'],
-  sin_sabados: true
+  criterios: [],
+  sin_sabados: false
 }
 
 const StoreContext = createContext<Store | null>(null)
