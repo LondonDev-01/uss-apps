@@ -1,0 +1,136 @@
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { HorarioCrudo, ClaseConDia, SeleccionUsuario, Preferencias, JsonStoreItem, Prioridad } from './types'
+
+interface Store {
+  // Raw data
+  horariosCrudos: HorarioCrudo[]
+  setHorariosCrudos: (h: HorarioCrudo[]) => void
+  addHorariosCrudos: (h: HorarioCrudo[]) => void
+  removeHorarioByNrc: (nrc: string) => void
+  clearHorarios: () => void
+  
+  // User selections
+  selecciones: Record<string, SeleccionUsuario>
+  setSeleccion: (key: string, value: SeleccionUsuario | null) => void
+  updateSeleccion: (key: string, value: SeleccionUsuario | null) => void
+  setSelecciones: (s: Record<string, SeleccionUsuario>) => void
+  
+  // Optimized schedules
+  mejoresHorarios: ClaseConDia[][]
+  setMejoresHorarios: (m: ClaseConDia[][]) => void
+  indiceHorario: number
+  setIndiceHorario: (i: number) => void
+  
+  // JSON store
+  jsonStore: Record<string, JsonStoreItem>
+  setJsonStore: (j: Record<string, JsonStoreItem>) => void
+  
+  // Preferences
+  preferencias: Preferencias
+  setPreferencia: (k: keyof Preferencias, v: boolean) => void
+  setPreferencias: (p: Preferencias) => void
+  
+  // UI state
+  activeTab: number
+  setActiveTab: (i: number) => void
+  
+  // Toast
+  toast: string | null
+  showToast: (msg: string) => void
+  clearToast: () => void
+  
+  // Reset
+  resetAll: () => void
+}
+
+const PREF_INIT: Preferencias = {
+  entrar_tarde: true,
+  salir_temprano: true,
+  sin_ventanas: true,
+  sin_sabados: true
+}
+
+const StoreContext = createContext<Store | null>(null)
+
+export function StoreProvider({ children }: { children: ReactNode }) {
+  const [horariosCrudos, setHorariosCrudos] = useState<HorarioCrudo[]>([])
+  const [selecciones, setSelecciones] = useState<Record<string, SeleccionUsuario>>({})
+  const [mejoresHorarios, setMejoresHorarios] = useState<ClaseConDia[][]>([])
+  const [indiceHorario, setIndiceHorario] = useState(0)
+  const [jsonStore, setJsonStore] = useState<Record<string, JsonStoreItem>>({})
+  const [preferencias, setPreferencias] = useState<Preferencias>(PREF_INIT)
+  const [activeTab, setActiveTab] = useState(0)
+  const [toast, setToast] = useState<string | null>(null)
+
+  const addHorariosCrudos = useCallback((nuevos: HorarioCrudo[]) => {
+    setHorariosCrudos(prev => {
+      const existing = new Set(prev.map(h => `${h.nrc}|${h.dia_parseado}|${h.hora_str}`))
+      const unicos = nuevos.filter(h => !existing.has(`${h.nrc}|${h.dia_parseado}|${h.hora_str}`))
+      return [...prev, ...unicos]
+    })
+  }, [])
+
+  const removeHorarioByNrc = useCallback((nrc: string) => {
+    setHorariosCrudos(prev => prev.filter(h => h.nrc !== nrc))
+    setSelecciones(prev => {
+      const next = { ...prev }
+      Object.keys(next).filter(k => k.startsWith(`${nrc}_`)).forEach(k => delete next[k])
+      return next
+    })
+  }, [])
+
+  const clearHorarios = useCallback(() => {
+    setHorariosCrudos([])
+    setSelecciones({})
+    setMejoresHorarios([])
+    setIndiceHorario(0)
+    setJsonStore({})
+  }, [])
+
+  const setSeleccion = useCallback((key: string, value: SeleccionUsuario | null) => {
+    setSelecciones(prev => {
+      const next = { ...prev }
+      if (value === null) delete next[key]
+      else next[key] = value
+      return next
+    })
+  }, [])
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3000)
+  }, [])
+
+  const clearToast = useCallback(() => setToast(null), [])
+
+  const resetAll = useCallback(() => {
+    setHorariosCrudos([])
+    setSelecciones({})
+    setMejoresHorarios([])
+    setIndiceHorario(0)
+    setJsonStore({})
+    setPreferencias(PREF_INIT)
+    setActiveTab(0)
+  }, [])
+
+  return (
+    <StoreContext.Provider value={{
+      horariosCrudos, setHorariosCrudos, addHorariosCrudos, removeHorarioByNrc, clearHorarios,
+      selecciones, setSeleccion, updateSeleccion: setSeleccion, setSelecciones,
+      mejoresHorarios, setMejoresHorarios, indiceHorario, setIndiceHorario,
+      jsonStore, setJsonStore,
+      preferencias, setPreferencia: (k, v) => setPreferencias(p => ({ ...p, [k]: v })), setPreferencias,
+      activeTab, setActiveTab,
+      toast, showToast, clearToast,
+      resetAll
+    }}>
+      {children}
+    </StoreContext.Provider>
+  )
+}
+
+export function useStore() {
+  const ctx = useContext(StoreContext)
+  if (!ctx) throw new Error('useStore must be used within StoreProvider')
+  return ctx
+}
