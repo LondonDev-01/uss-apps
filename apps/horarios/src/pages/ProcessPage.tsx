@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../store'
 import { agruparPorNrc } from '../lib/parser'
 import { procesarSeleccionesUsuario, generarTopHorarios } from '../lib/optimizer'
@@ -40,6 +40,17 @@ export default function ProcessPage() {
   }
 
   const agrupados = agruparPorNrc(store.horariosCrudos)
+
+  useEffect(() => {
+    for (const [nrc, horarios] of Object.entries(agrupados)) {
+      horarios.forEach((h, i) => {
+        const key = `${nrc}_${i}`
+        if (h.dia_parseado && !store.selecciones[key]) {
+          store.setSeleccion(key, { dia: h.dia_parseado, horario: h, nrc_original: nrc })
+        }
+      })
+    }
+  }, [])
 
   const eliminarRamo = (nrc: string) => {
     const restantes = store.horariosCrudos.filter(h => h.nrc !== nrc)
