@@ -2,7 +2,8 @@ import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { useStore } from '../store'
 import { ClaseConDia } from '../types'
-import { Download, FileSpreadsheet, FileCode, CalendarClock, ChevronDown, Loader2, Sparkles, RotateCcw } from '../icons'
+import { Download, FileSpreadsheet, FileCode, CalendarClock, ChevronDown, Loader2, Sparkles, RotateCcw, Palette } from '../icons'
+import { generarExcelColoreado } from '../lib/excelExport'
 
 function generarCSV(horario: ClaseConDia[]): string {
   const grouped: Record<string, { nrc: string; titulo: string; tipo: string; bloques: string[] }> = {}
@@ -89,9 +90,10 @@ function downloadFile(content: string, filename: string, mime: string) {
 }
 
 const EXPORT_OPTIONS = [
-  { id: 'csv', label: 'CSV (Excel)', desc: 'Compatible con Excel, Google Sheets, LibreOffice', icon: FileSpreadsheet, color: 'var(--color-success)', mime: 'text/csv', ext: 'csv', gen: generarCSV },
-  { id: 'json', label: 'JSON', desc: 'Para respaldo técnico o integración con otras apps', icon: FileCode, color: 'var(--color-primary)', mime: 'application/json', ext: 'json', gen: generarJSON },
-  { id: 'ical', label: 'iCal (.ics)', desc: 'Importar en Google Calendar, Apple Calendar, Outlook', icon: CalendarClock, color: 'var(--color-accent)', mime: 'text/calendar', ext: 'ics', gen: generarICal },
+  { id: 'xls', label: 'Excel Coloreado', desc: 'Horario con colores por ramo, listo para imprimir', icon: Palette, color: 'var(--color-success)', mime: 'application/vnd.ms-excel', ext: 'xls', gen: generarExcelColoreado, recommended: true },
+  { id: 'csv', label: 'CSV', desc: 'Tabla simple, compatible con Excel/Sheets', icon: FileSpreadsheet, color: 'var(--color-primary)', mime: 'text/csv', ext: 'csv', gen: generarCSV },
+  { id: 'ical', label: 'iCal (.ics)', desc: 'Para Google Calendar, Apple Calendar, Outlook', icon: CalendarClock, color: 'var(--color-accent)', mime: 'text/calendar', ext: 'ics', gen: generarICal },
+  { id: 'json', label: 'JSON', desc: 'Respaldo técnico o integración con otras apps', icon: FileCode, color: 'var(--color-muted)', mime: 'application/json', ext: 'json', gen: generarJSON },
 ] as const
 
 export default function ExportPage() {
@@ -154,7 +156,7 @@ export default function ExportPage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="grid md:grid-cols-3 gap-4"
+        className="grid md:grid-cols-2 lg:grid-cols-4 gap-4"
       >
         {EXPORT_OPTIONS.map((opt, i) => (
           <motion.div
@@ -162,8 +164,13 @@ export default function ExportPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 * i }}
-            className="card rounded-2xl overflow-hidden border border-border"
+            className="card rounded-2xl overflow-hidden border border-border relative"
           >
+            {'recommended' in opt && opt.recommended && (
+              <div className="absolute top-0 right-0 px-2.5 py-1 rounded-bl-xl text-[10px] font-bold uppercase tracking-wider" style={{ background: 'var(--color-success)', color: 'var(--color-bg)' }}>
+                Top
+              </div>
+            )}
             <div className="p-4">
               <div className="flex items-start gap-3 mb-4">
                 <motion.div

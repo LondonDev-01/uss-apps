@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion'
 import { useStore } from '../store'
-import ScheduleGrid, { getNrcColors, normTipo } from '../components/ScheduleGrid'
-import { ChevronLeft, ChevronRight, RotateCcw, Download, Sparkles, Calendar, Info, AlertCircle } from '../icons'
+import ScheduleGrid, { getNrcColors } from '../components/ScheduleGrid'
+import { getCourseColors, normTipo } from '../lib/colors'
+import { ChevronLeft, ChevronRight, RotateCcw, Download, Sparkles, Calendar, AlertCircle } from '../icons'
 import { useNavigate } from 'react-router-dom'
+import { ClaseConDia } from '../types'
 
 export default function SchedulePage() {
   const store = useStore()
@@ -23,10 +25,12 @@ export default function SchedulePage() {
 
   const horarioActual = store.mejoresHorarios[store.indiceHorario]
   const nrcColors = getNrcColors(horarioActual)
+  const courseColors = getCourseColors(horarioActual)
 
-  const ramosVistos: Record<string, { titulo: string; tipo: string }> = {}
+  const ramosVistos: Record<string, { titulo: string; tipo: string; clases: ClaseConDia[] }> = {}
   for (const h of horarioActual) {
-    if (!(h.nrc in ramosVistos)) ramosVistos[h.nrc] = { titulo: h.titulo, tipo: h.tipo }
+    if (!(h.nrc in ramosVistos)) ramosVistos[h.nrc] = { titulo: h.titulo, tipo: h.tipo, clases: [] }
+    ramosVistos[h.nrc].clases.push(h)
   }
 
   const titulosEnHorario = new Set(Object.values(ramosVistos).map(r => r.titulo))
@@ -130,26 +134,52 @@ export default function SchedulePage() {
               {Object.entries(ramosVistos).map(([nrc, info], i) => {
                 const color = nrcColors[nrc] ?? '#CBD5E1'
                 const t = normTipo(info.tipo)
+                const ordenadas = [...info.clases].sort((a, b) => {
+                  const ordenDia = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+                  return ordenDia.indexOf(a.dia) - ordenDia.indexOf(b.dia)
+                })
+                const diasUnicos: string[] = []
+                for (const c of ordenadas) {
+                  if (!diasUnicos.includes(c.dia)) diasUnicos.push(c.dia)
+                }
+                const diasTexto = diasUnicos.join('/').toUpperCase()
+                const tooltipTexto = [
+                  info.titulo,
+                  ...ordenadas.map(c => `${c.dia}: ${c.hora_inicio}-${c.hora_fin}`)
+                ].join('\n')
                 return (
                   <motion.div
                     key={nrc}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.05 * i }}
-                    className="flex items-start gap-3"
+                    className="flex items-start gap-3 p-2 -m-2 rounded-lg hover:bg-accent/30 transition-colors cursor-help"
+                    title={tooltipTexto}
                   >
                     <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ type: 'spring', stiffness: 500, damping: 30, delay: 0.05 * i }}
-                      className="w-3.5 h-3.5 rounded flex-shrink-0 mt-1"
+                      className="w-4 h-4 rounded flex-shrink-0 mt-0.5 border border-black/10"
                       style={{ background: color }}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-fg truncate">{info.titulo}</div>
-                      <div className="text-xs text-muted flex items-center gap-1">
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-border/50">{t}</span>
-                        <span>NRC: {nrc}</span>
+                      <div className="font-semibold text-sm text-fg leading-tight" title={info.titulo}>
+                        {info.titulo}
+                      </div>
+                      <div className="text-xs text-muted mt-0.5">
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[10px] font-bold mr-1.5"
+                          style={{ background: color, color: '#1E293B' }}
+                        >
+                          {t}
+                        </span>
+                        <span className="font-mono">NRC {nrc}</span>
+                      </div>
+                      <div className="text-[11px] text-fg mt-1 font-medium">
+                        {info.clases.length} {info.clases.length === 1 ? 'clase' : 'clases'}{' '}
+                        <span className="text-muted">·</span>{' '}
+                        <span className="text-muted font-normal">{diasTexto}</span>
                       </div>
                     </div>
                   </motion.div>
