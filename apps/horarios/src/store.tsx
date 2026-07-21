@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { HorarioCrudo, ClaseConDia, SeleccionUsuario, Preferencias, CriterioHorario, JsonStoreItem, Prioridad } from './types'
+import { HorarioCrudo, ClaseConDia, SeleccionUsuario, Preferencias, CriterioHorario, JsonStoreItem, Prioridad, ExcluidoInfo } from './types'
 
 interface Store {
   // Raw data
@@ -20,6 +20,8 @@ interface Store {
   setMejoresHorarios: (m: ClaseConDia[][]) => void
   indiceHorario: number
   setIndiceHorario: (i: number) => void
+  excluidosDetallados: ExcluidoInfo[]
+  setExcluidosDetallados: (e: ExcluidoInfo[]) => void
   
   // JSON store
   jsonStore: Record<string, JsonStoreItem>
@@ -56,6 +58,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [selecciones, setSelecciones] = useState<Record<string, SeleccionUsuario>>({})
   const [mejoresHorarios, setMejoresHorarios] = useState<ClaseConDia[][]>([])
   const [indiceHorario, setIndiceHorario] = useState(0)
+  const [excluidosDetallados, setExcluidosDetallados] = useState<ExcluidoInfo[]>([])
   const [jsonStore, setJsonStore] = useState<Record<string, JsonStoreItem>>({})
   const [preferencias, setPreferencias] = useState<Preferencias>(PREF_INIT)
   const [activeTab, setActiveTab] = useState(0)
@@ -107,6 +110,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setSelecciones({})
     setMejoresHorarios([])
     setIndiceHorario(0)
+    setExcluidosDetallados([])
     setJsonStore({})
     setPreferencias(PREF_INIT)
     setActiveTab(0)
@@ -117,6 +121,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       horariosCrudos, setHorariosCrudos, addHorariosCrudos, removeHorarioByNrc, clearHorarios,
       selecciones, setSeleccion, updateSeleccion: setSeleccion, setSelecciones,
       mejoresHorarios, setMejoresHorarios, indiceHorario, setIndiceHorario,
+      excluidosDetallados, setExcluidosDetallados,
       jsonStore, setJsonStore,
       preferencias, setPreferencia: (k, v) => setPreferencias(p => ({ ...p, [k]: v })), setPreferencias,
       setCriterios: (c) => setPreferencias(p => ({ ...p, criterios: c })),

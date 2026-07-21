@@ -86,6 +86,7 @@ export default function ProcessPage() {
       }
       store.setMejoresHorarios(resultado.horarios)
       store.setIndiceHorario(0)
+      store.setExcluidosDetallados(resultado.excluidosDetallados)
       store.showToast('¡Horarios generados!')
       navigate('/schedule')
     } catch (e) {

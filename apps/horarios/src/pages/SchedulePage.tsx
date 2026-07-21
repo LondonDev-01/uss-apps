@@ -34,13 +34,19 @@ export default function SchedulePage() {
   }
 
   const titulosEnHorario = new Set(Object.values(ramosVistos).map(r => r.titulo))
-  const excluidos = new Set<string>()
-  for (const h of store.horariosCrudos) {
-    if (h.prioridad > 0 && !titulosEnHorario.has(h.titulo)) {
-      excluidos.add(h.titulo)
-    }
-  }
-  const excluidosList = [...excluidos]
+  const excluidosDetallados = store.excluidosDetallados.length > 0
+    ? store.excluidosDetallados.filter(e => !titulosEnHorario.has(e.titulo))
+    : (() => {
+        const excluidos: { titulo: string; conflictos: string[] }[] = []
+        for (const h of store.horariosCrudos) {
+          if (h.prioridad > 0 && !titulosEnHorario.has(h.titulo)) {
+            if (!excluidos.some(e => e.titulo === h.titulo)) {
+              excluidos.push({ titulo: h.titulo, conflictos: [] })
+            }
+          }
+        }
+        return excluidos
+      })()
 
   const reiniciar = () => {
     if (confirm('¿Reiniciar todo y perder los datos?')) {
@@ -200,7 +206,7 @@ export default function SchedulePage() {
         </motion.div>
       </motion.div>
 
-      {excluidosList.length > 0 && (
+      {excluidosDetallados.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -215,25 +221,34 @@ export default function SchedulePage() {
           <AlertCircle className="w-5 h-5 flex-shrink-0 text-warning mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-fg mb-1">
-              {excluidosList.length === 1 ? 'Ramo no incluido' : `${excluidosList.length} ramos no incluidos`}
+              {excluidosDetallados.length === 1 ? 'Ramo no incluido' : `${excluidosDetallados.length} ramos no incluidos`}
             </p>
-            <p className="text-xs text-muted mb-2">
-              Estos ramos no pudieron incluirse en ninguna combinacion sin conflictos:
+            <p className="text-xs text-muted mb-3">
+              Estos ramos no pudieron incluirse en esta combinación:
             </p>
-            <ul className="text-sm text-fg space-y-1">
-              {excluidosList.map((titulo, i) => (
-                <motion.li
-                  key={titulo}
+            <div className="space-y-3">
+              {excluidosDetallados.map((excl, i) => (
+                <motion.div
+                  key={excl.titulo}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 + 0.05 * i }}
-                  className="flex items-center gap-2"
+                  className="pl-3 border-l-2 border-warning/50"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-warning flex-shrink-0" />
-                  <span className="truncate">{titulo}</span>
-                </motion.li>
+                  <span className="text-sm font-semibold text-fg block truncate">{excl.titulo}</span>
+                  {excl.conflictos.length > 0 && (
+                    <ul className="text-xs text-muted mt-1 space-y-0.5">
+                      {excl.conflictos.map((c, j) => (
+                        <li key={j} className="flex items-start gap-1.5">
+                          <span className="text-warning mt-px">↳</span>
+                          <span>Choca con: {c}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </motion.div>
               ))}
-            </ul>
+            </div>
           </div>
         </motion.div>
       )}

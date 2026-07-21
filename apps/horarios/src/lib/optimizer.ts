@@ -1,4 +1,4 @@
-import { HorarioCrudo, ClaseConDia, SeleccionUsuario, Preferencias } from '../types'
+import { HorarioCrudo, ClaseConDia, SeleccionUsuario, Preferencias, ResultadoOptimizacion, ExcluidoInfo } from '../types'
 
 function horaAMinutos(hora: string): number {
   try {
@@ -186,7 +186,7 @@ export function generarTopHorarios(
   candidatos: ClaseConDia[],
   topN = 10,
   preferencias: Preferencias
-): { horarios: ClaseConDia[][]; mensaje: string; excluidos: string[] } {
+): ResultadoOptimizacion {
   const prioridadPorTitulo: Record<string, number> = {}
   for (const c of candidatos) {
     if (!(c.titulo in prioridadPorTitulo) || c.prioridad < prioridadPorTitulo[c.titulo]) {
@@ -235,17 +235,15 @@ export function generarTopHorarios(
       return {
         horarios: [],
         mensaje: `Ramos prioritarios sin combinación válida:\n${detalle}\n\nQuítalo de Prioridad o cámbialo de NRC.`,
-        excluidos: []
+        excluidos: [],
+        excluidosDetallados: []
       }
     }
   }
 
-  const todasOptsElectivos: OpcionRamo[] = []
-  for (const o of opts2) todasOptsElectivos.push(...o)
-
   const listaFinal: (OpcionRamo | [])[][] = []
   for (const o of opts0) listaFinal.push(o)
-  if (todasOptsElectivos.length > 0) listaFinal.push(todasOptsElectivos)
+  for (const o of opts2) listaFinal.push([...o, []])
   for (const o of opts1) listaFinal.push([...o, []])
 
   let total = 1
@@ -255,7 +253,8 @@ export function generarTopHorarios(
     return {
       horarios: [],
       mensaje: `Demasiadas combinaciones (${total.toLocaleString()}). Reduce ramos opcionales.`,
-      excluidos: []
+      excluidos: [],
+      excluidosDetallados: []
     }
   }
 
@@ -307,7 +306,7 @@ export function generarTopHorarios(
       const tops = Object.entries(conflictos).sort((a, b) => b[1] - a[1]).slice(0, 3)
       msg += '\n\nConflictos más frecuentes:\n' + tops.map(([c, n]) => `• ${c} (${n})`).join('\n')
     }
-    return { horarios: [], mensaje: msg, excluidos: [] }
+    return { horarios: [], mensaje: msg, excluidos: [], excluidosDetallados: [] }
   }
 
   validos.sort((a, b) => b[0] - a[0])
@@ -355,11 +354,65 @@ export function generarTopHorarios(
   for (const t of nombres1) if (!titulosEnMejor.has(t)) excluidos.push(t)
   for (const t of nombres2) if (!titulosEnMejor.has(t)) excluidos.push(t)
 
+  const mejorHorario = mejores[0] ?? []
+  const excluidosDetallados = calcularConflictosExcluidos(mejorHorario, candidatos, nombres1, nombres2)
+
   return {
     horarios: mejores,
     mensaje: `¡Éxito! ${validos.length} opciones encontradas (${mejores.length} diversas).`,
-    excluidos
+    excluidos,
+    excluidosDetallados
   }
+}
+
+function calcularConflictosExcluidos(
+  mejorHorario: ClaseConDia[],
+  candidatos: ClaseConDia[],
+  nombresP1: string[],
+  nombresP2: string[]
+): ExcluidoInfo[] {
+  const titulosEnHorario = new Set(mejorHorario.map(c => c.titulo))
+  const titulosExcluidos = new Set<string>()
+  for (const t of nombresP1) if (!titulosEnHorario.has(t)) titulosExcluidos.add(t)
+  for (const t of nombresP2) if (!titulosEnHorario.has(t)) titulosExcluidos.add(t)
+
+  if (titulosExcluidos.size === 0) return []
+
+  const bloquesExcluidos: Record<string, { dia: string; inicio: number; fin: number }[]> = {}
+  for (const c of candidatos) {
+    if (titulosExcluidos.has(c.titulo)) {
+      (bloquesExcluidos[c.titulo] ??= []).push({
+        dia: c.dia,
+        inicio: c.minutos_inicio,
+        fin: c.minutos_fin,
+      })
+    }
+  }
+
+  const resultado: ExcluidoInfo[] = []
+  for (const titulo of titulosExcluidos) {
+    const bloques = bloquesExcluidos[titulo] ?? []
+    const conflictos: string[] = []
+
+    for (const bloque of bloques) {
+      for (const clase of mejorHorario) {
+        if (clase.dia !== bloque.dia) continue
+        if (clase.minutos_inicio < bloque.fin && clase.minutos_fin > bloque.inicio) {
+          const mmToHHMM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+          const msg = `${clase.titulo} (${clase.dia} ${mmToHHMM(clase.minutos_inicio)}-${mmToHHMM(clase.minutos_fin)})`
+          if (!conflictos.includes(msg)) conflictos.push(msg)
+        }
+      }
+    }
+
+    if (conflictos.length === 0) {
+      conflictos.push('Sin conflictos directos — no cupo en la mejor combinación')
+    }
+
+    resultado.push({ titulo, conflictos })
+  }
+
+  return resultado
 }
 
 function calcularPuntaje(horario: ClaseConDia[], prefs: Preferencias): number {
