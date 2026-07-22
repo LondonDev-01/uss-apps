@@ -6,3 +6,8 @@ dist/
 .env
 .env.local
 .vite/
+.atl/
+*/node_modules
+*/dist
+*/pnpm-workspace.yaml
+*/package-lock.json
