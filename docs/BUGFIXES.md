@@ -11,6 +11,7 @@ Registro de los arreglos aplicados a partir de los bugs listados en
 | BUG 2: Conteo de clases incorrecto | UX | Resuelto | `frontend/src/pages/SchedulePage.tsx` |
 | BUG 3: Electivos no aparecen en opciones | Medio | Sin cambios (ya implementado) | — |
 | BUG 4: Excel con varias hojas | Bajo | Sin cambios (ya implementado) | — |
+| Mejora UX: autoscroll al cambiar de pestaña | UX | Implementado | `frontend/src/pages/UploadPage.tsx`, `frontend/src/pages/CategorizePage.tsx`, `frontend/src/pages/ProcessPage.tsx`, `frontend/src/pages/SchedulePage.tsx` |
 
 ---
 
@@ -169,6 +170,55 @@ código, sin necesidad de cambios.
 
 ---
 
+## Mejora de UX — Autoscroll al cambiar de pestaña
+
+### Motivación
+
+Al avanzar en el wizard (Upload → Categorize → Process → Schedule →
+Export), la posición del scroll se quedaba a mitad de camino después de
+presionar el botón de continuación. Eso oculta la cabecera de la página
+destino, donde normalmente están los criterios, filtros o resúmenes más
+importantes.
+
+### Cambio aplicado
+
+Se aplicó una doble estrategia en las cuatro páginas principales del
+wizard:
+
+1. **Scroll inmediato al presionar el botón de continuar** (behavior
+   `instant`), para evitar que la navegación arrastre la posición
+   anterior.
+2. **Scroll suave al montar la página** (`useEffect` con behavior
+   `smooth`), para cubrir deep links o recargas que no pasen por el
+   botón.
+
+### Archivos y botones afectados
+
+- `frontend/src/pages/UploadPage.tsx`
+  - Botón: "Continuar: Categorizar ramos" (`continueToCategorize`).
+- `frontend/src/pages/CategorizePage.tsx`
+  - Botón: "Continuar: Asignar días" (`handleProceed`).
+- `frontend/src/pages/ProcessPage.tsx`
+  - Botón: "Optimizar horario →" (`optimizar`, antes de
+    `navigate('/schedule')`).
+- `frontend/src/pages/SchedulePage.tsx`
+  - Botón: "Exportar horario" (antes de `navigate('/export')`).
+
+### Fragmento típico
+
+```typescript
+// Antes de navegar
+window.scrollTo({ top: 0, behavior: 'instant' })
+navigate('/ruta-siguiente')
+
+// Al montar el componente
+useEffect(() => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}, [])
+```
+
+---
+
 ## Archivos modificados
 
 - `frontend/src/lib/optimizer.ts`
@@ -176,6 +226,13 @@ código, sin necesidad de cambios.
   - Red de seguridad defensiva antes de calcular excluidos (~L435).
 - `frontend/src/pages/SchedulePage.tsx`
   - Texto del header con conteo dual bloques/cursos (~L102).
+  - Autoscroll en botón "Exportar horario" y al montar la página.
+- `frontend/src/pages/UploadPage.tsx`
+  - Autoscroll en botón "Continuar: Categorizar ramos" y al montar la página.
+- `frontend/src/pages/CategorizePage.tsx`
+  - Autoscroll en botón "Continuar: Asignar días" y al montar la página.
+- `frontend/src/pages/ProcessPage.tsx`
+  - Autoscroll en botón "Optimizar horario" y al montar la página.
 
 ## Archivos no modificados (referencia)
 
