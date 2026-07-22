@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useStore } from '../store'
 import ScheduleGrid, { getNrcColors } from '../components/ScheduleGrid'
 import { getCourseColors, normTipo } from '../lib/colors'
@@ -11,6 +11,10 @@ import { ClaseConDia, ExcluidoInfo } from '../types'
 export default function SchedulePage() {
   const store = useStore()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
 
   if (store.mejoresHorarios.length === 0) {
     return (
@@ -261,7 +265,10 @@ export default function SchedulePage() {
           </motion.div>
 
           <motion.button
-            onClick={() => navigate('/export')}
+            onClick={() => {
+              window.scrollTo({ top: 0, behavior: 'instant' })
+              navigate('/export')
+            }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="btn-primary w-full py-3 rounded-xl flex items-center justify-center gap-2"

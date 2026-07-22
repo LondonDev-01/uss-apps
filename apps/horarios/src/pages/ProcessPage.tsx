@@ -25,6 +25,11 @@ const BADGE_CLASSES = {
 export default function ProcessPage() {
   const store = useStore()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
   const [optimizing, setOptimizing] = useState(false)
 
   if (store.horariosCrudos.length === 0) {
@@ -88,6 +93,7 @@ export default function ProcessPage() {
       store.setIndiceHorario(0)
       store.setExcluidosDetallados(resultado.excluidosDetallados)
       store.showToast('¡Horarios generados!')
+      window.scrollTo({ top: 0, behavior: 'instant' })
       navigate('/schedule')
     } catch (e) {
       console.error(e)
