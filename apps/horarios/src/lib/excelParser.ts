@@ -170,18 +170,65 @@ export function parseExcelToHorarioCrudo(data: unknown[][]): HorarioCrudo[] {
   return results
 }
 
-export function parseExcelFile(file: File): Promise<HorarioCrudo[]> {
+export interface SheetInfo {
+  name: string
+  rowCount: number
+}
+
+export interface ExcelParseResult {
+  sheets: SheetInfo[]
+  parsed: HorarioCrudo[]
+}
+
+export function parseExcelFile(file: File): Promise<ExcelParseResult> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer)
         const workbook = XLSX.read(data, { type: 'array' })
-        const sheetName = workbook.SheetNames[0]
+        const sheets: SheetInfo[] = []
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName]
+          const json = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })
+          const parsed = parseExcelToHorarioCrudo(json)
+          sheets.push({ name: sheetName, rowCount: parsed.length })
+        }
+        const allParsed: HorarioCrudo[] = []
+        const seenGlobal = new Set<string>()
+        for (const sheet of workbook.SheetNames) {
+          const s = workbook.Sheets[sheet]
+          const json = XLSX.utils.sheet_to_json<unknown[]>(s, { header: 1, defval: '' })
+          const parsed = parseExcelToHorarioCrudo(json)
+          for (const row of parsed) {
+            const key = `${row.nrc}|${row.tipo}|${row.seccion}|${row.hora_str}|${row.dia_parseado}`
+            if (!seenGlobal.has(key)) {
+              seenGlobal.add(key)
+              allParsed.push(row)
+            }
+          }
+        }
+        resolve({ sheets, parsed: allParsed })
+      } catch (err) {
+        reject(err)
+      }
+    }
+    reader.onerror = () => reject(new Error('Error leyendo archivo'))
+    reader.readAsArrayBuffer(file)
+  })
+}
+
+export function parseExcelSheet(file: File, sheetName: string): Promise<HorarioCrudo[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
         const sheet = workbook.Sheets[sheetName]
+        if (!sheet) { resolve([]); return }
         const json = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })
-        const parsed = parseExcelToHorarioCrudo(json)
-        resolve(parsed)
+        resolve(parseExcelToHorarioCrudo(json))
       } catch (err) {
         reject(err)
       }

@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useStore } from '../store'
 import { useNavigate } from 'react-router-dom'
-import { parseExcelFile } from '../lib/excelParser'
+import { parseExcelFile, parseExcelSheet, SheetInfo } from '../lib/excelParser'
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, ArrowRight, Trash2, HelpCircle, Loader2, X, ChevronDown, ChevronUp } from '../icons'
 import type { HorarioCrudo } from '../types'
 
@@ -293,6 +293,63 @@ function CourseBreakdownCard({ course }: { course: CourseInfo }) {
   )
 }
 
+function SheetPickerModal({ open, sheets, onSelect, onCancel }: {
+  open: boolean
+  sheets: SheetInfo[] | null
+  onSelect: (name: string) => void
+  onCancel: () => void
+}) {
+  return (
+    <AnimatePresence>
+      {open && sheets && sheets.length > 1 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          onClick={onCancel}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="card max-w-md w-full"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-border">
+              <h3 className="text-lg font-bold text-fg">Selecciona la hoja</h3>
+              <p className="text-xs text-muted mt-0.5">
+                El archivo tiene {sheets.length} hojas. Elige la que contiene tu horario.
+              </p>
+            </div>
+            <div className="p-5 space-y-2">
+              {sheets.map((sheet) => (
+                <button
+                  key={sheet.name}
+                  onClick={() => onSelect(sheet.name)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-border hover:border-fg-muted hover:bg-surface-hover transition-colors text-left group"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-fg">{sheet.name}</p>
+                    <p className="text-xs text-muted mt-0.5">{sheet.rowCount} filas detectadas</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted group-hover:text-fg transition-colors" />
+                </button>
+              ))}
+            </div>
+            <div className="p-5 border-t border-border">
+              <button onClick={onCancel} className="w-full btn-ghost text-sm">
+                Cancelar
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 function BreakdownModal({ open, onClose, stats }: { open: boolean; onClose: () => void; stats: Stats }) {
   return (
     <AnimatePresence>
@@ -346,6 +403,9 @@ export default function UploadPage() {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentFileName, setCurrentFileName] = useState<string | null>(null)
+  const [availableSheets, setAvailableSheets] = useState<SheetInfo[] | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [showSheetPicker, setShowSheetPicker] = useState(false)
 
   const stats = useMemo(() => computeStats(store.horariosCrudos), [store.horariosCrudos])
 
@@ -354,6 +414,18 @@ export default function UploadPage() {
       fileInputRef.current.value = ''
     }
     fileInputRef.current?.click()
+  }
+
+  const applyParsed = (parsed: HorarioCrudo[]) => {
+    const previewRows = parsed.map(h => [
+      h.nrc, h.titulo, h.seccion, h.tipo, h.hora_str, h.dia_parseado ?? '-', h.liga || '-', h.conector || '-'
+    ])
+    setPreview({
+      rows: [['NRC', 'Nombre', 'Seccion', 'Tipo', 'Horario', 'Dia', 'Liga', 'Conector'], ...previewRows],
+      parsedCount: parsed.length,
+      numberShown: 10
+    })
+    store.setHorariosCrudos(parsed)
   }
 
   const handleFile = async (file: File) => {
@@ -365,18 +437,19 @@ export default function UploadPage() {
     setCurrentFileName(file.name)
     setProcessing(true)
     try {
-      const parsed = await parseExcelFile(file)
+      const result = await parseExcelFile(file)
 
-      const previewRows = parsed.map(h => [
-        h.nrc, h.titulo, h.seccion, h.tipo, h.hora_str, h.dia_parseado ?? '-', h.liga || '-', h.conector || '-'
-      ])
+      if (result.sheets.length > 1) {
+        setAvailableSheets(result.sheets)
+        setPendingFile(file)
+        setProcessing(false)
+        setCurrentFileName(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        setShowSheetPicker(true)
+        return
+      }
 
-      setPreview({
-        rows: [['NRC', 'Nombre', 'Seccion', 'Tipo', 'Horario', 'Dia', 'Liga', 'Conector'], ...previewRows],
-        parsedCount: parsed.length,
-        numberShown: 10
-      })
-      store.setHorariosCrudos(parsed)
+      applyParsed(result.parsed)
     } catch (e) {
       setError('Error leyendo el archivo. Verifica el formato.')
       console.error(e)
@@ -386,6 +459,26 @@ export default function UploadPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
+    }
+  }
+
+  const handleSheetSelect = async (sheetName: string) => {
+    if (!pendingFile) return
+    setShowSheetPicker(false)
+    setProcessing(true)
+    setCurrentFileName(pendingFile.name)
+    try {
+      const parsed = await parseExcelSheet(pendingFile, sheetName)
+      applyParsed(parsed)
+    } catch (e) {
+      setError('Error leyendo la hoja seleccionada.')
+      console.error(e)
+    } finally {
+      setProcessing(false)
+      setCurrentFileName(null)
+      setPendingFile(null)
+      setAvailableSheets(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -732,6 +825,17 @@ export default function UploadPage() {
         open={showBreakdownModal}
         onClose={() => setShowBreakdownModal(false)}
         stats={stats}
+      />
+      <SheetPickerModal
+        open={showSheetPicker}
+        sheets={availableSheets}
+        onSelect={handleSheetSelect}
+        onCancel={() => {
+          setShowSheetPicker(false)
+          setPendingFile(null)
+          setAvailableSheets(null)
+          if (fileInputRef.current) fileInputRef.current.value = ''
+        }}
       />
     </>
   )
