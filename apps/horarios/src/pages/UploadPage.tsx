@@ -395,6 +395,11 @@ function BreakdownModal({ open, onClose, stats }: { open: boolean; onClose: () =
 export default function UploadPage() {
   const store = useStore()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [preview, setPreview] = useState<{ rows: string[][]; parsedCount: number; numberShown: number } | null>(null)
@@ -513,6 +518,7 @@ export default function UploadPage() {
       setError('Sube un archivo primero')
       return
     }
+    window.scrollTo({ top: 0, behavior: 'instant' })
     store.setActiveTab(1)
     navigate('/categorize')
   }

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../store'
 import { useNavigate } from 'react-router-dom'
 import { agruparPorNrc } from '../lib/parser'
@@ -15,6 +15,11 @@ const PRIORIDADES = [
 export default function CategorizePage() {
   const store = useStore()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [showHelp, setShowHelp] = useState(false)
 
@@ -81,6 +86,7 @@ export default function CategorizePage() {
   }
 
   const handleProceed = async () => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
     navigate('/process')
   }
 
