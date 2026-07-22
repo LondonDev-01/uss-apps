@@ -477,26 +477,28 @@ export default function UploadPage() {
             dragging
               ? 'dragging border-fg-muted'
               : 'border-border hover:border-fg-muted'
-          } ${processing ? 'pointer-events-none opacity-60' : ''}`}
+          } ${processing ? 'pointer-events-none opacity-60' : ''} ${preview ? 'pointer-events-none opacity-90' : ''}`}
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
-          onClick={openFileDialog}
-          role="button"
-          tabIndex={0}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openFileDialog() }}
+          onClick={preview ? undefined : openFileDialog}
+          role={preview ? undefined : 'button'}
+          tabIndex={preview ? -1 : 0}
+          onKeyDown={e => { if (!preview && (e.key === 'Enter' || e.key === ' ')) openFileDialog() }}
         >
           <input
             ref={fileInputRef}
             type="file"
             accept=".xlsx,.xls"
             onChange={e => {
+              if (preview) return
               const file = e.target.files?.[0]
               if (file) handleFile(file)
               e.target.value = ''
             }}
             className="absolute inset-0 opacity-0 cursor-pointer"
             aria-label="Seleccionar archivo Excel"
+            disabled={!!preview}
           />
           <div className="p-10 sm:p-14 text-center relative">
             <motion.div
@@ -517,9 +519,11 @@ export default function UploadPage() {
                   <CheckCircle className="w-7 h-7" style={{ color: 'var(--color-success)' }} />
                 </div>
                 <p className="text-fg font-medium text-lg">
-                  <span className="text-fg font-bold">{preview.parsedCount}</span> filas detectadas
+                  <span className="text-fg font-bold">{preview.parsedCount}</span> filas cargadas
                 </p>
-                <p className="text-muted text-sm mt-2">Sube otro archivo para reemplazar</p>
+                <p className="text-muted text-sm mt-2 max-w-md mx-auto">
+                  Los datos persisten al cambiar de pestaña. Para subir otro archivo, presiona <span className="font-semibold text-fg">Quitar</span>.
+                </p>
               </>
             ) : (
               <>
