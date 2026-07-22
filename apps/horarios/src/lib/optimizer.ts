@@ -292,7 +292,11 @@ export function generarTopHorarios(
     for (const t of titlesP0Set) {
       if (!titlesEnPlano.has(t)) { incluyeTodoP0 = false; break }
     }
-    if (!incluyeTodoP0) continue
+    if (!incluyeTodoP0) {
+      console.warn('[optimizer] combinación descartada, faltan P0:',
+        [...titlesP0Set].filter(t => !titlesEnPlano.has(t)))
+      continue
+    }
 
     let mezclaNrcs = false
     const nrcsPorCursoYTipo: Record<string, Set<string>> = {}
@@ -429,6 +433,30 @@ export function generarTopHorarios(
         mejores.push(h)
       }
       if (mejores.length >= topN) break
+    }
+  }
+
+  // Red de seguridad: garantizar que ningún horario mostrado omita un P0.
+  // Estructuralmente el loop de combinaciones ya lo asegura, pero el
+  // post-procesamiento de electivos (diversidad/reemplazos) muta `mejores`,
+  // así que forzamos la invariant de forma explícita por si fallara.
+  const titulosP0Esperados = new Set(nombres0)
+  if (titulosP0Esperados.size > 0 && mejores.length > 0) {
+    for (let i = mejores.length - 1; i >= 0; i--) {
+      const presentes = new Set(mejores[i].map(c => c.titulo))
+      const faltantes = [...titulosP0Esperados].filter(t => !presentes.has(t))
+      if (faltantes.length > 0) {
+        console.warn('[optimizer] descartando horario final sin P0:', faltantes)
+        mejores.splice(i, 1)
+      }
+    }
+    if (mejores.length === 0) {
+      return {
+        horarios: [],
+        mensaje: 'No se pudo generar ningún horario que incluya todos los ramos prioritarios (P0). Revisa que cada P0 tenga un NRC con día asignado y sin tope.',
+        excluidos: [],
+        excluidosDetallados: []
+      }
     }
   }
 
