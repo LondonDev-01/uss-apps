@@ -219,6 +219,21 @@ export function generarTopHorarios(
     }
   }
 
+  for (const [, porTitulo] of Object.entries(ramosPorPrioridad)) {
+    for (const titulo of Object.keys(porTitulo)) {
+      for (const tipo of Object.keys(porTitulo[titulo])) {
+        const bloquesNrcs = porTitulo[titulo][tipo]
+        if (bloquesNrcs.length <= 1) continue
+        const seen = new Map<string, ClaseConDia[]>()
+        for (const grupo of bloquesNrcs) {
+          const sig = grupo.map(b => `${b.dia}|${b.hora_inicio}|${b.hora_fin}`).sort().join(';')
+          if (!seen.has(sig)) seen.set(sig, grupo)
+        }
+        porTitulo[titulo][tipo] = [...seen.values()]
+      }
+    }
+  }
+
   const [opts0, nombres0] = consolidarOpciones(ramosPorPrioridad[0] ?? {})
   const [opts1, nombres1] = consolidarOpciones(ramosPorPrioridad[1] ?? {})
   const [opts2, nombres2] = consolidarOpciones(ramosPorPrioridad[2] ?? {})
@@ -248,7 +263,7 @@ export function generarTopHorarios(
 
   let total = 1
   for (const op of listaFinal) total *= op.length
-  const LIMITE = 500_000
+  const LIMITE = 100_000
   if (total > LIMITE) {
     return {
       horarios: [],
