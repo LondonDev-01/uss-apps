@@ -31,6 +31,10 @@ export default function SchedulePage() {
   const tienePreferencias = store.preferencias.criterios.length > 0 || store.preferencias.sin_sabados
   const cumplePrefs = tienePreferencias ? cumplePreferencias(horarioActual, store.preferencias) : true
 
+  const electivosEnHorario = [...new Set(
+    horarioActual.filter(c => c.prioridad === 2).map(c => c.titulo)
+  )]
+
   const ramosVistos: Record<string, { titulo: string; tipo: string; clases: ClaseConDia[] }> = {}
   for (const h of horarioActual) {
     if (!(h.nrc in ramosVistos)) ramosVistos[h.nrc] = { titulo: h.titulo, tipo: h.tipo, clases: [] }
@@ -98,6 +102,25 @@ export default function SchedulePage() {
                 ({horarioActual.length} {horarioActual.length === 1 ? 'clase' : 'clases'} semanales)
               </span>
             </p>
+            {electivosEnHorario.length > 0 ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-success/10 text-success border border-success/20"
+                title={electivosEnHorario.join(', ')}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Incluye: {electivosEnHorario.length === 1
+                  ? electivosEnHorario[0]
+                  : electivosEnHorario.slice(0, 2).join(', ') + (electivosEnHorario.length > 2 ? '…' : '')}
+              </span>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-muted/10 text-muted border border-muted/20"
+                title="Esta opción no incluye electivos"
+              >
+                <Info className="w-3.5 h-3.5" />
+                Sin electivos
+              </span>
+            )}
             {tienePreferencias && (
               <span
                 className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${

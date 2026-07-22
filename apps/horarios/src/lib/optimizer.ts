@@ -340,7 +340,7 @@ export function generarTopHorarios(
   }
 
   const layoutCore = (h: ClaseConDia[]) =>
-    new Set(h.map(c => `${c.dia}|${c.hora_inicio}|${c.hora_fin}`))
+    new Set(h.map(c => `${c.titulo}|${c.dia}|${c.hora_inicio}|${c.hora_fin}`))
 
   for (const [, h] of validos) {
     const signature = [...new Set(h.map(c => c.nrc))].sort().join('|')
@@ -380,6 +380,47 @@ export function generarTopHorarios(
     mejores.length = 0
     mejores.push(...conElectivos)
   }
+
+  const electivosEnResultados = new Set<string>()
+  for (const h of mejores) {
+    for (const c of h) {
+      if (c.prioridad === 2) electivosEnResultados.add(c.titulo)
+    }
+  }
+  for (const titulo of nombres2) {
+    if (electivosEnResultados.has(titulo)) continue
+    const firmaFaltante = (h: ClaseConDia[]) => [...new Set(h.map(c => c.nrc))].sort().join('|')
+    const firmasActuales = new Set(mejores.map(h => firmaFaltante(h)))
+    const candidatoIdx = validos.findIndex(([, h]) => {
+      if (!h.some(c => c.prioridad === 2 && c.titulo === titulo)) return false
+      const f = firmaFaltante(h)
+      if (firmasActuales.has(f)) return false
+      const [valido] = verificarConflictos(h)
+      return valido
+    })
+    if (candidatoIdx === -1) continue
+    if (mejores.length === 0) {
+      mejores.push(validos[candidatoIdx][1])
+    } else {
+      let peorIdx = 0
+      for (let i = 1; i < mejores.length; i++) {
+        if (contarElectivos(mejores[i]) < contarElectivos(mejores[peorIdx])) peorIdx = i
+      }
+      const peor = mejores[peorIdx]
+      const electivosDelPeor = new Set(peor.filter(c => c.prioridad === 2).map(c => c.titulo))
+      electivosDelPeor.delete(titulo)
+      if (electivosDelPeor.size === 0) {
+        mejores[peorIdx] = validos[candidatoIdx][1]
+        firmasActuales.add(firmaFaltante(validos[candidatoIdx][1]))
+      } else {
+        mejores.push(validos[candidatoIdx][1])
+        firmasActuales.add(firmaFaltante(validos[candidatoIdx][1]))
+      }
+    }
+    electivosEnResultados.add(titulo)
+    if (mejores.length > topN) mejores.length = topN
+  }
+
   if (mejores.length === 0) {
     for (const [, h] of validos) {
       const signature = [...new Set(h.map(c => c.nrc))].sort().join('|')
