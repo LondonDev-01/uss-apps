@@ -11,6 +11,7 @@ Registro de los arreglos aplicados a partir de los bugs listados en
 | BUG 2: Conteo de clases incorrecto | UX | Resuelto | `frontend/src/pages/SchedulePage.tsx` |
 | BUG 3: Electivos no aparecen en opciones | Medio | Sin cambios (ya implementado) | — |
 | BUG 4: Excel con varias hojas | Bajo | Sin cambios (ya implementado) | — |
+| BUG 5: Clases visibles en detalle pero no en grilla (renderizado) | Crítico | Resuelto | `frontend/src/components/ScheduleGrid.tsx` |
 | Mejora UX: autoscroll al cambiar de pestaña | UX | Implementado | `frontend/src/pages/UploadPage.tsx`, `frontend/src/pages/CategorizePage.tsx`, `frontend/src/pages/ProcessPage.tsx`, `frontend/src/pages/SchedulePage.tsx` |
 
 ---
@@ -219,6 +220,68 @@ useEffect(() => {
 
 ---
 
+## BUG 5 — Clases visibles en detalle pero no en la grilla (renderizado crítico)
+
+### Síntoma reportado por usuario
+
+> Al generar un horario de semestre 8, el header muestra "17 bloques", el
+> detalle lateral lista todas las asignaturas, pero en la grilla visual
+> aparecen menos bloques. Por ejemplo, una clase del Lunes a las 16:00
+> aparece en la leyenda del lado pero no en el calendario.
+
+### Análisis
+
+El problema estaba en `frontend/src/components/ScheduleGrid.tsx:47`, que
+usaba slots de tiempo fijos para decidir qué clase se dibujaba en cada
+fila:
+
+```typescript
+const SLOTS = ['08:00', '09:30', '11:00', '12:30', '13:11', '14:40', '16:00', '17:35', '19:00']
+```
+
+La condición de búsqueda era:
+
+```typescript
+return hi <= slotMinutes[si] && slotMinutes[si] < hf
+```
+
+Esta condición exige que la clase **empiece antes o exactamente en el
+horario del slot**. Si una clase empieza unos minutos después (ej:
+`16:10` en el slot de las `16:00`), la comparación `970 <= 960` es
+`false`, la clase no se encuentra en ningún slot y **desaparece de la
+grilla visual** aunque siga estando presente en `horarioActual` (por eso
+el conteo y la leyenda lateral sí la mostraban).
+
+### Fix aplicado
+
+Se reemplazó la condición por una de **solapamiento real** entre la
+clase y el rango del slot:
+
+```typescript
+const slotStart = slotMinutes[si]
+const slotEnd = si < SLOTS.length - 1 ? slotMinutes[si + 1] : Infinity
+return hi < slotEnd && hf > slotStart
+```
+
+Ahora una clase se dibuja en un slot si ocupa algún tiempo dentro de ese
+rango, independientemente de si arranca exactamente en el borde. El
+cálculo de `rowSpan` y el sistema `placed[]` se mantuvieron sin cambios.
+
+### Consecuencias
+
+- Clases que antes eran invisibles ahora se renderizan.
+- Clases levemente desfasadas se muestran en el slot correcto en lugar
+de desaparecer.
+- Cero regresión: las clases que ya se renderizaban correctamente
+siguen cumpliendo la nueva condición (si `hi <= slotStart`, entonces
+`hi < slotEnd` también se cumple).
+
+### Archivo modificado
+
+- `frontend/src/components/ScheduleGrid.tsx` — línea de búsqueda por slot.
+
+---
+
 ## Archivos modificados
 
 - `frontend/src/lib/optimizer.ts`
@@ -240,6 +303,8 @@ useEffect(() => {
   tocó: la lógica de matching liga/conector tiene propósito (vincular
   la TEO con su LAB correcta) y modificarla podría emparejar
   secciones incorrectas del mismo ramo.
+- `frontend/src/components/ScheduleGrid.tsx` — condición de búsqueda por
+  slot corregida para evitar clases invisibles (BUG 5).
 - `frontend/src/pages/UploadPage.tsx` — sheet picker multi-hoja ya
   presente (BUG 4).
 - `frontend/src/lib/optimizer.ts:342-343` — `layoutCore` con `titulo`
