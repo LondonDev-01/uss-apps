@@ -44,7 +44,9 @@ export default function ScheduleGrid({ horario, showMeta = true }: Props) {
         if (c.dia !== d) return false
         const hi = hhmmToMin(c.hora_inicio)
         const hf = hhmmToMin(c.hora_fin)
-        return hi <= slotMinutes[si] && slotMinutes[si] < hf
+        const slotStart = slotMinutes[si]
+        const slotEnd = si < SLOTS.length - 1 ? slotMinutes[si + 1] : Infinity
+        return hi < slotEnd && hf > slotStart
       })
 
       if (!clase) {
