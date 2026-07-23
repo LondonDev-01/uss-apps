@@ -13,6 +13,7 @@ Registro de los arreglos aplicados a partir de los bugs listados en
 | BUG 4: Excel con varias hojas | Bajo | Sin cambios (ya implementado) | — |
 | BUG 5: Clases visibles en detalle pero no en grilla (renderizado) | Crítico | Resuelto | `frontend/src/components/ScheduleGrid.tsx` |
 | Mejora UX: autoscroll al cambiar de pestaña | UX | Implementado | `frontend/src/pages/UploadPage.tsx`, `frontend/src/pages/CategorizePage.tsx`, `frontend/src/pages/ProcessPage.tsx`, `frontend/src/pages/SchedulePage.tsx` |
+| Exportación: Excel `.xlsx` real en lugar de HTML `.xls` | Alto | Implementado | `frontend/src/lib/excelExport.ts`, `frontend/src/pages/ExportPage.tsx` |
 
 ---
 
@@ -220,6 +221,47 @@ useEffect(() => {
 
 ---
 
+## Exportación — Excel `.xlsx` real (antes HTML `.xls`)
+
+### Motivación
+
+> Windows se quejaba al abrir el archivo `.xls` exportado.
+
+### Análisis
+
+El exportador antiguo (`frontend/src/lib/excelExport.ts`) generaba una
+tabla HTML con namespaces de Microsoft Office, le asignaba el MIME
+`application/vnd.ms-excel` y la extensión `.xls`. Excel era capaz de
+abrirlo, pero no era un archivo `.xls` real. Windows/Excel moderno
+advertía al usuario sobre la discrepancia entre extensión y contenido.
+
+### Cambio aplicado
+
+1. Se instaló `xlsx-js-style` (fork de SheetJS con soporte de estilos).
+2. Se reescribió `generarExcelColoreado` para generar un workbook
+   `.xlsx` real usando `xlsx-js-style`:
+   - Hoja **"Horario"** con slots de tiempo, días de la semana, celdas
+     coloreadas por NRC, bordes, alineación y merges verticales para
+     clases que ocupan más de un slot.
+   - Hoja **"Leyenda"** con color, título, tipo, NRC y días/horarios de
+     cada ramo.
+3. En `ExportPage.tsx`:
+   - Se cambió `ext: 'xls'` por `ext: 'xlsx'`.
+   - Se cambió el MIME a
+     `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`.
+   - Se actualizó `downloadFile` para aceptar `BlobPart` (string o
+     `Uint8Array`).
+   - Se actualizó el tipo de `EXPORT_OPTIONS` para soportar generadores
+     que retornan `BlobPart`.
+
+### Archivos y dependencias
+
+- `frontend/src/lib/excelExport.ts` — reescrito completamente.
+- `frontend/src/pages/ExportPage.tsx` — tipos, MIME y extensión.
+- `frontend/package.json` — agregada dependencia `xlsx-js-style`.
+
+---
+
 ## BUG 5 — Clases visibles en detalle pero no en la grilla (renderizado crítico)
 
 ### Síntoma reportado por usuario
@@ -296,6 +338,10 @@ siguen cumpliendo la nueva condición (si `hi <= slotStart`, entonces
   - Autoscroll en botón "Continuar: Asignar días" y al montar la página.
 - `frontend/src/pages/ProcessPage.tsx`
   - Autoscroll en botón "Optimizar horario" y al montar la página.
+- `frontend/src/lib/excelExport.ts`
+  - Reescrito para generar `.xlsx` real con `xlsx-js-style`.
+- `frontend/src/pages/ExportPage.tsx`
+  - Extensión, MIME y tipos actualizados para soportar export `.xlsx`.
 
 ## Archivos no modificados (referencia)
 
@@ -310,3 +356,9 @@ siguen cumpliendo la nueva condición (si `hi <= slotStart`, entonces
 - `frontend/src/lib/optimizer.ts:342-343` — `layoutCore` con `titulo`
   presente, diversidad de electivos implementada en
   `generarTopHorarios` (BUG 3).
+- `frontend/src/lib/excelExport.ts` — generación real de `.xlsx` con dos
+  hojas ("Horario" y "Leyenda") manteniendo colores por ramo.
+
+## Dependencias agregadas
+
+- `xlsx-js-style@^1.2.0` — generación de `.xlsx` con colores y estilos.
