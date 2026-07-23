@@ -1,11 +1,13 @@
-import { motion } from 'framer-motion'
-import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect, useMemo } from 'react'
 import { useStore } from '../store'
 import { agruparPorNrc } from '../lib/parser'
-import { procesarSeleccionesUsuario, generarTopHorarios } from '../lib/optimizer'
-import { ChevronRight, Trash2, AlertTriangle, Loader2, Sparkles, Sun, Moon, Clock } from '../icons'
+import { procesarSeleccionesUsuario, generarTopHorarios, horarioCrudoToClase, verificarConflictos } from '../lib/optimizer'
+import { normTipo } from '../lib/colors'
+import ScheduleGrid from '../components/ScheduleGrid'
+import { ChevronRight, Trash2, AlertTriangle, Loader2, Sparkles, Sun, Moon, Clock, CheckCircle, Zap, Settings, AlertCircle } from '../icons'
 import { useNavigate } from 'react-router-dom'
-import { CRITERIO_LABELS, CRITERIO_ORDER, CriterioHorario } from '../types'
+import { CRITERIO_LABELS, CRITERIO_ORDER, CriterioHorario, HorarioCrudo, ClaseConDia } from '../types'
 
 const DIAS_OPCIONES = ['Seleccionar', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
@@ -31,6 +33,139 @@ export default function ProcessPage() {
   }, [])
 
   const [optimizing, setOptimizing] = useState(false)
+
+  const modo = store.modoManual ? 'manual' as const : 'auto' as const
+  const setModo = (m: 'auto' | 'manual') => store.setModoManual(m === 'manual')
+
+  // --- Manual mode computed values ---
+  const cursosPorTitulo = useMemo(() => {
+    const byTitulo: Record<string, Record<string, HorarioCrudo[]>> = {}
+    for (const h of store.horariosCrudos) {
+      if (!byTitulo[h.titulo]) byTitulo[h.titulo] = {}
+      if (!byTitulo[h.titulo][h.nrc]) byTitulo[h.titulo][h.nrc] = []
+      byTitulo[h.titulo][h.nrc].push(h)
+    }
+    return byTitulo
+  }, [store.horariosCrudos])
+
+  const manualSchedule = useMemo(() => {
+    const selected = new Set(store.manualNrcs)
+    return store.horariosCrudos
+      .filter(h => selected.has(h.nrc))
+      .map(horarioCrudoToClase)
+  }, [store.manualNrcs, store.horariosCrudos])
+
+  const [conflictoValido, conflictoMsg] = useMemo(() => {
+    if (manualSchedule.length < 2) return [true, '']
+    return verificarConflictos(manualSchedule)
+  }, [manualSchedule])
+
+  const nrcsSeleccionados = new Set(store.manualNrcs)
+
+  // Find the NRC linked via liga/conector for a given NRC within the same titulo.
+  // Uses the same matching logic as the optimizer's consolidarOpciones.
+  const findLinkedNrc = (nrc: string, titulo: string, targetTipo: 'TEO' | 'LAB'): string | null => {
+    const nrcBlocks = cursosPorTitulo[titulo]?.[nrc]
+    if (!nrcBlocks || nrcBlocks.length === 0) return null
+    const base = nrcBlocks[0]
+    const bLiga = base.liga?.trim() ?? ''
+    const bConn = base.conector?.trim() ?? ''
+
+    const candidates = Object.entries(cursosPorTitulo[titulo] ?? {})
+      .filter(([candNrc, blocks]) => candNrc !== nrc && normTipo(blocks[0].tipo) === targetTipo)
+
+    for (const [candNrc, candBlocks] of candidates) {
+      const cBase = candBlocks[0]
+      const cLiga = cBase.liga?.trim() ?? ''
+      const cConn = cBase.conector?.trim() ?? ''
+      if (!bLiga && !bConn && !cLiga && !cConn) return candNrc
+      if (bLiga === cConn && bConn === cLiga) return candNrc
+    }
+    return null
+  }
+
+  const toggleNrcManual = (nrc: string, titulo: string, tipo: string) => {
+    const normT = normTipo(tipo)
+    const prev = new Set(store.manualNrcs)
+
+    if (prev.has(nrc)) {
+      // Deselect: also deselect linked NRC
+      prev.delete(nrc)
+      if (normT === 'TEO') {
+        const linked = findLinkedNrc(nrc, titulo, 'LAB')
+        if (linked) prev.delete(linked)
+      } else if (normT === 'LAB') {
+        const linked = findLinkedNrc(nrc, titulo, 'TEO')
+        if (linked) prev.delete(linked)
+      }
+    } else {
+      // Auto-deselect other NRCs of same titulo+tipo
+      for (const n of prev) {
+        const blocks = store.horariosCrudos.filter(h => h.nrc === n)
+        if (blocks.length > 0 && blocks[0].titulo === titulo && normTipo(blocks[0].tipo) === normT) {
+          // Also deselect its linked NRC before removing
+          if (normT === 'TEO') {
+            const linked = findLinkedNrc(n, titulo, 'LAB')
+            if (linked) prev.delete(linked)
+          } else if (normT === 'LAB') {
+            const linked = findLinkedNrc(n, titulo, 'TEO')
+            if (linked) prev.delete(linked)
+          }
+          prev.delete(n)
+        }
+      }
+      prev.add(nrc)
+      // Auto-select linked NRC
+      if (normT === 'TEO') {
+        const linked = findLinkedNrc(nrc, titulo, 'LAB')
+        if (linked) prev.add(linked)
+      } else if (normT === 'LAB') {
+        const linked = findLinkedNrc(nrc, titulo, 'TEO')
+        if (linked) prev.add(linked)
+      }
+    }
+    store.setManualNrcs([...prev])
+  }
+
+  // Check for incomplete TEO/LAB pairs
+  const incompletos = useMemo(() => {
+    const result: string[] = []
+    for (const [titulo, nrcsMap] of Object.entries(cursosPorTitulo)) {
+      const nrcEntries = Object.entries(nrcsMap)
+      const hasTeo = nrcEntries.some(([, b]) => normTipo(b[0].tipo) === 'TEO')
+      const hasLab = nrcEntries.some(([, b]) => normTipo(b[0].tipo) === 'LAB')
+      if (!hasTeo || !hasLab) continue // No constraint if only one type exists
+
+      const selectedTeo = nrcEntries.some(([nrc, b]) => normTipo(b[0].tipo) === 'TEO' && nrcsSeleccionados.has(nrc))
+      const selectedLab = nrcEntries.some(([nrc, b]) => normTipo(b[0].tipo) === 'LAB' && nrcsSeleccionados.has(nrc))
+
+      if (selectedTeo && !selectedLab) result.push(`${titulo}: falta seleccionar el LAB`)
+      else if (!selectedTeo && selectedLab) result.push(`${titulo}: falta seleccionar el TEO`)
+    }
+    return result
+  }, [cursosPorTitulo, store.manualNrcs])
+
+  const guardarManual = () => {
+    if (manualSchedule.length === 0) {
+      store.showToast('Selecciona al menos un NRC')
+      return
+    }
+    if (incompletos.length > 0) {
+      store.showToast('Hay ramos con TEO/LAB incompletos')
+      return
+    }
+    if (!conflictoValido) {
+      store.showToast('Hay conflictos en el horario: ' + conflictoMsg)
+      return
+    }
+    store.setMejoresHorarios([manualSchedule])
+    store.setIndiceHorario(0)
+    store.setExcluidosDetallados([])
+    store.showToast('¡Horario manual guardado!')
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    navigate('/schedule')
+  }
+  // --- End manual mode ---
 
   if (store.horariosCrudos.length === 0) {
     return (
@@ -130,13 +265,43 @@ export default function ProcessPage() {
         className="flex flex-col sm:flex-row sm:items-end justify-between gap-4"
       >
         <div>
-          <h2 className="text-2xl font-bold text-fg">Asigna días a cada bloque</h2>
+          <h2 className="text-2xl font-bold text-fg">
+            {modo === 'auto' ? 'Asigna días a cada bloque' : 'Arma tu horario manualmente'}
+          </h2>
           <p className="text-muted mt-1">
-            El optimizador elegirá la mejor combinación automáticamente según tus preferencias.
+            {modo === 'auto'
+              ? 'El optimizador elegirá la mejor combinación automáticamente según tus preferencias.'
+              : 'Selecciona los NRCs que quieres cursar. El sistema valida conflictos en tiempo real.'}
           </p>
+        </div>
+        <div className="flex items-center gap-1 p-1 rounded-xl border border-border bg-surface">
+          <button
+            onClick={() => setModo('auto')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              modo === 'auto'
+                ? 'bg-primary text-bg shadow-sm'
+                : 'text-muted hover:text-fg'
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            Automático
+          </button>
+          <button
+            onClick={() => setModo('manual')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              modo === 'manual'
+                ? 'bg-primary text-bg shadow-sm'
+                : 'text-muted hover:text-fg'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            Manual
+          </button>
         </div>
       </motion.div>
 
+      {modo === 'auto' && (
+      <>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -313,6 +478,222 @@ export default function ProcessPage() {
           )}
         </button>
       </motion.div>
+      </>
+      )}
+
+      {modo === 'manual' && (
+      <>
+        {/* Course NRC selection cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.13 }}
+          className="space-y-4"
+        >
+          {Object.entries(cursosPorTitulo).map(([titulo, nrcsMap], idx) => {
+            const nrcEntries = Object.entries(nrcsMap)
+            const teoNrcs = nrcEntries.filter(([, blocks]) => normTipo(blocks[0].tipo) === 'TEO')
+            const labNrcs = nrcEntries.filter(([, blocks]) => normTipo(blocks[0].tipo) === 'LAB')
+            const otroNrcs = nrcEntries.filter(([, blocks]) => normTipo(blocks[0].tipo) === 'OTRO')
+            const groups: [string, [string, HorarioCrudo[]][]][] = []
+            if (teoNrcs.length > 0) groups.push(['TEO', teoNrcs])
+            if (labNrcs.length > 0) groups.push(['LAB', labNrcs])
+            if (otroNrcs.length > 0) groups.push(['OTRO', otroNrcs])
+            const p = nrcEntries[0]?.[1]?.[0]?.prioridad ?? 0
+            const catColors = CAT_COLORS[p as 0 | 1 | 2]
+
+            return (
+              <motion.div
+                key={titulo}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 * idx }}
+                className="relative overflow-hidden rounded-2xl border bg-surface"
+                style={{ borderColor: catColors.border }}
+              >
+                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: catColors.border }} />
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-3 flex-wrap">
+                    <span className="font-semibold text-fg text-lg">{titulo}</span>
+                    <span className="badge text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: catColors.bg, color: catColors.text }}>
+                      {CAT_LABELS[p as 0 | 1 | 2]}
+                    </span>
+                  </div>
+
+                  {groups.map(([tipoLabel, entries]) => (
+                    <div key={tipoLabel} className="mb-3 last:mb-0">
+                      <p className="text-xs text-muted uppercase tracking-wider font-semibold mb-2">{tipoLabel}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {entries.map(([nrc, blocks]) => {
+                          const isSelected = nrcsSeleccionados.has(nrc)
+                          const tipo = normTipo(blocks[0].tipo)
+                          const tipoColor = tipo === 'TEO' ? 'var(--color-primary)' : tipo === 'LAB' ? 'var(--color-success)' : 'var(--color-muted)'
+                          const diasUnicos: string[] = []
+                          for (const b of blocks) {
+                            if (b.dia_parseado && !diasUnicos.includes(b.dia_parseado)) diasUnicos.push(b.dia_parseado)
+                          }
+                          return (
+                            <motion.button
+                              key={nrc}
+                              onClick={() => toggleNrcManual(nrc, titulo, blocks[0].tipo)}
+                              whileHover={{ scale: 1.01 }}
+                              whileTap={{ scale: 0.99 }}
+                              className={`relative p-3 rounded-xl border text-left transition-all ${
+                                isSelected
+                                  ? 'shadow-md'
+                                  : 'border-border bg-bg-elevated/30 hover:border-primary/30'
+                              }`}
+                              style={isSelected ? {
+                                borderColor: 'var(--color-primary)',
+                                background: 'color-mix(in srgb, var(--color-primary) 8%, var(--color-bg-elevated))',
+                                boxShadow: '0 0 0 1px var(--color-primary), 0 4px 16px -6px var(--color-primary)',
+                              } : undefined}
+                              aria-pressed={isSelected}
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-mono text-sm font-bold text-fg">NRC {nrc}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                    style={{ background: tipoColor, color: 'var(--color-bg)' }}
+                                  >
+                                    {blocks[0].tipo}
+                                  </span>
+                                  <span className="text-xs text-muted font-mono">{blocks[0].seccion}</span>
+                                </div>
+                              </div>
+                              <div className="space-y-0.5">
+                                {blocks.map((b, bi) => (
+                                  <p key={bi} className="text-xs text-fg/80">
+                                    <span className="font-medium">{b.dia_parseado ?? '-'}</span>
+                                    <span className="text-muted mx-1">·</span>
+                                    <span className="font-mono">{b.hora_str}</span>
+                                  </p>
+                                ))}
+                              </div>
+                              {blocks[0].ubicacion && blocks[0].ubicacion !== 'S/I' && (
+                                <p className="text-[10px] text-muted mt-1 truncate">{blocks[0].ubicacion}</p>
+                              )}
+                              {isSelected && (
+                                <motion.div
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center"
+                                  style={{ background: 'var(--color-primary)', color: 'var(--color-bg)' }}
+                                >
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                </motion.div>
+                              )}
+                            </motion.button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )
+          })}
+        </motion.div>
+
+        {/* Incomplete TEO/LAB warning */}
+        <AnimatePresence>
+          {incompletos.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-start gap-3 p-4 rounded-2xl"
+              style={{
+                background: 'rgba(245, 158, 11, 0.08)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+              }}
+              role="alert"
+            >
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 text-warning mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-fg mb-1">Ramos con TEO/LAB incompletos</p>
+                <ul className="text-xs text-muted space-y-0.5">
+                  {incompletos.map((msg, i) => (
+                    <li key={i}>• {msg}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted mt-2">
+                  Si un ramo tiene TEO y LAB, debes seleccionar ambos (o ninguno).
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Conflict warning */}
+        <AnimatePresence>
+          {!conflictoValido && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-start gap-3 p-4 rounded-2xl"
+              style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+              }}
+              role="alert"
+            >
+              <AlertCircle className="w-5 h-5 flex-shrink-0 text-danger mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-fg mb-1">Conflicto de horario</p>
+                <p className="text-xs text-muted">{conflictoMsg}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Schedule preview */}
+        {manualSchedule.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="card rounded-2xl overflow-hidden"
+          >
+            <div className="p-4 border-b border-border">
+              <h3 className="font-semibold text-fg flex items-center gap-2">
+                <Clock className="w-5 h-5 text-primary" />
+                Vista previa ({manualSchedule.length} {manualSchedule.length === 1 ? 'bloque' : 'bloques'})
+              </h3>
+            </div>
+            <ScheduleGrid horario={manualSchedule} />
+          </motion.div>
+        )}
+
+        {/* Save button */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center justify-between p-4 bg-surface rounded-2xl border border-border"
+        >
+          <div className="text-sm">
+            <span className="font-medium text-fg">{nrcsSeleccionados.size}</span>{' '}
+            {nrcsSeleccionados.size === 1 ? 'NRC seleccionado' : 'NRCs seleccionados'}
+            {manualSchedule.length > 0 && (
+              <span className="text-muted ml-2">
+                ({manualSchedule.length} {manualSchedule.length === 1 ? 'bloque' : 'bloques'})
+              </span>
+            )}
+          </div>
+          <button
+            onClick={guardarManual}
+            disabled={manualSchedule.length === 0 || !conflictoValido || incompletos.length > 0}
+            className="btn-primary px-6 py-3 text-lg font-semibold rounded-xl disabled:opacity-50"
+          >
+            <CheckCircle className="w-5 h-5 mr-2" />
+            Guardar horario manual
+          </button>
+        </motion.div>
+      </>
+      )}
     </motion.div>
   )
 }

@@ -33,6 +33,12 @@ interface Store {
   setPreferencias: (p: Preferencias) => void
   setCriterios: (c: CriterioHorario[]) => void
   
+  // Manual mode
+  modoManual: boolean
+  setModoManual: (m: boolean) => void
+  manualNrcs: string[]
+  setManualNrcs: (n: string[]) => void
+
   // UI state
   activeTab: number
   setActiveTab: (i: number) => void
@@ -63,6 +69,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [preferencias, setPreferencias] = useState<Preferencias>(PREF_INIT)
   const [activeTab, setActiveTab] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
+  const [modoManual, setModoManual] = useState(false)
+  const [manualNrcs, setManualNrcs] = useState<string[]>([])
 
   const addHorariosCrudos = useCallback((nuevos: HorarioCrudo[]) => {
     setHorariosCrudos(prev => {
@@ -87,6 +95,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setMejoresHorarios([])
     setIndiceHorario(0)
     setJsonStore({})
+    setManualNrcs([])
   }, [])
 
   const setSeleccion = useCallback((key: string, value: SeleccionUsuario | null) => {
@@ -114,6 +123,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setJsonStore({})
     setPreferencias(PREF_INIT)
     setActiveTab(0)
+    setModoManual(false)
+    setManualNrcs([])
   }, [])
 
   return (
@@ -125,6 +136,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       jsonStore, setJsonStore,
       preferencias, setPreferencia: (k, v) => setPreferencias(p => ({ ...p, [k]: v })), setPreferencias,
       setCriterios: (c) => setPreferencias(p => ({ ...p, criterios: c })),
+      modoManual, setModoManual, manualNrcs, setManualNrcs,
       activeTab, setActiveTab,
       toast, showToast, clearToast,
       resetAll

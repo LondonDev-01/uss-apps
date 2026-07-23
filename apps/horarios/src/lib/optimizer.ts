@@ -551,6 +551,35 @@ function calcularPuntaje(horario: ClaseConDia[], prefs: Preferencias): number {
   return Math.floor(total)
 }
 
+export function horarioCrudoToClase(h: HorarioCrudo): ClaseConDia {
+  const [hIni, hFin] = h.hora_str.split(' - ')
+  const mIni = horaAMinutos(hIni)
+  const mFin = horaAMinutos(hFin)
+  const ubicacion = h.ubicacion.replace(/Edificio:/g, '').replace(/Salón:/g, '').trim()
+  const partes = ubicacion.split(/\s+/)
+  const edificio = partes[0] ?? 'N/A'
+  const salon = partes[1] ?? 'N/A'
+  return {
+    nrc: h.nrc,
+    titulo: h.titulo,
+    tipo: h.tipo,
+    seccion: h.seccion,
+    dia: h.dia_parseado ?? '',
+    hora_inicio: hIni,
+    hora_fin: hFin,
+    minutos_inicio: mIni,
+    minutos_fin: mFin,
+    edificio,
+    salon,
+    instructor: h.instructor,
+    fecha_inicio: h.fecha_inicio,
+    fecha_fin: h.fecha_fin,
+    prioridad: h.prioridad,
+    liga: h.liga,
+    conector: h.conector
+  }
+}
+
 export { verificarConflictos, calcularPuntaje }
 
 export function cumplePreferencias(horario: ClaseConDia[], prefs: Preferencias): boolean {
