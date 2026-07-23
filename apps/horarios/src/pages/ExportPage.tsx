@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, SVGProps } from 'react'
 import { useStore } from '../store'
 import { ClaseConDia } from '../types'
 import { Download, FileSpreadsheet, FileCode, CalendarClock, ChevronDown, Loader2, Sparkles, RotateCcw, Palette } from '../icons'
@@ -79,7 +79,7 @@ function generarICal(horario: ClaseConDia[]): string {
   return ical
 }
 
-function downloadFile(content: string, filename: string, mime: string) {
+function downloadFile(content: BlobPart, filename: string, mime: string) {
   const blob = new Blob([content], { type: mime })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -89,12 +89,26 @@ function downloadFile(content: string, filename: string, mime: string) {
   URL.revokeObjectURL(url)
 }
 
-const EXPORT_OPTIONS = [
-  { id: 'xls', label: 'Excel Coloreado', desc: 'Horario con colores por ramo, listo para imprimir', icon: Palette, color: 'var(--color-success)', mime: 'application/vnd.ms-excel', ext: 'xls', gen: generarExcelColoreado, recommended: true },
+type IconComponent = React.ComponentType<SVGProps<SVGSVGElement> & { size?: number }>
+
+interface ExportOption {
+  id: string
+  label: string
+  desc: string
+  icon: IconComponent
+  color: string
+  mime: string
+  ext: string
+  gen: (horario: ClaseConDia[]) => BlobPart
+  recommended?: boolean
+}
+
+const EXPORT_OPTIONS: ExportOption[] = [
+  { id: 'xlsx', label: 'Excel Coloreado', desc: 'Horario con colores por ramo, listo para imprimir', icon: Palette, color: 'var(--color-success)', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ext: 'xlsx', gen: generarExcelColoreado, recommended: true },
   { id: 'csv', label: 'CSV', desc: 'Tabla simple, compatible con Excel/Sheets', icon: FileSpreadsheet, color: 'var(--color-primary)', mime: 'text/csv', ext: 'csv', gen: generarCSV },
   { id: 'ical', label: 'iCal (.ics)', desc: 'Para Google Calendar, Apple Calendar, Outlook', icon: CalendarClock, color: 'var(--color-accent)', mime: 'text/calendar', ext: 'ics', gen: generarICal },
   { id: 'json', label: 'JSON', desc: 'Respaldo técnico o integración con otras apps', icon: FileCode, color: 'var(--color-muted)', mime: 'application/json', ext: 'json', gen: generarJSON },
-] as const
+]
 
 export default function ExportPage() {
   const store = useStore()
@@ -117,11 +131,13 @@ export default function ExportPage() {
   const horarioActual = store.mejoresHorarios[store.indiceHorario]
   const num = store.indiceHorario + 1
 
-  const handleGenerate = async (id: string, gen: (h: ClaseConDia[]) => string) => {
+  const handleGenerate = async (id: string, gen: (h: ClaseConDia[]) => BlobPart) => {
     setGenerating(id)
     await new Promise(r => setTimeout(r, 100))
     const content = gen(horarioActual)
-    setGenerated(prev => ({ ...prev, [id]: content }))
+    if (typeof content === 'string') {
+      setGenerated(prev => ({ ...prev, [id]: content }))
+    }
     const opt = EXPORT_OPTIONS.find(o => o.id === id)!
     downloadFile(content, `Horario_Opcion_${num}.${opt.ext}`, opt.mime)
     setGenerating(null)

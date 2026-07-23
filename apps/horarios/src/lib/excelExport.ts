@@ -1,5 +1,6 @@
 import { ClaseConDia } from '../types'
-import { getCourseColors, getNrcColor, normTipo } from './colors'
+import { getNrcColor, normTipo } from './colors'
+import * as XLSX from 'xlsx-js-style'
 
 const DIAS_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const DURACION_BLOQUE = 80
@@ -15,15 +16,38 @@ function minToHhmm(m: number): string {
   return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+function toRgb(hex: string): string {
+  return hex.replace('#', '').toUpperCase()
 }
 
-export function generarExcelColoreado(horario: ClaseConDia[]): string {
+function cellStyle(
+  fill?: string,
+  fontColor?: string,
+  fontBold?: boolean,
+  fontSize?: number
+): XLSX.CellStyle {
+  const style: XLSX.CellStyle = {
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: {
+      top: { color: { rgb: '475569' }, style: 'thin' },
+      bottom: { color: { rgb: '475569' }, style: 'thin' },
+      left: { color: { rgb: '475569' }, style: 'thin' },
+      right: { color: { rgb: '475569' }, style: 'thin' }
+    },
+    font: {
+      name: 'Arial',
+      sz: fontSize ?? 9,
+      color: { rgb: fontColor ?? '1E293B' },
+      bold: fontBold ?? false
+    }
+  }
+  if (fill) {
+    style.fill = { fgColor: { rgb: toRgb(fill) }, patternType: 'solid' }
+  }
+  return style
+}
+
+export function generarExcelColoreado(horario: ClaseConDia[]): Uint8Array {
   if (horario.length === 0) {
     return generarExcelVacio()
   }
@@ -40,8 +64,7 @@ export function generarExcelColoreado(horario: ClaseConDia[]): string {
   }
   if (slots.length === 0) slots.push(inicioMin)
 
-  const courseColors = getCourseColors(horario)
-
+  // Encontrar qué clase va en cada celda del grid (slot x día)
   const placeCell: Record<string, ClaseConDia | null> = {}
   for (const d of dias) {
     for (const slot of slots) {
@@ -56,6 +79,7 @@ export function generarExcelColoreado(horario: ClaseConDia[]): string {
     }
   }
 
+  // Slots que deben saltarse porque están cubiertos por el rowspan de una clase anterior
   const skipSlots: Record<string, Set<number>> = {}
   for (const d of dias) skipSlots[d] = new Set()
   for (const c of horario) {
@@ -66,41 +90,104 @@ export function generarExcelColoreado(horario: ClaseConDia[]): string {
     }
   }
 
-  const headerStyle = `background:#1E293B;color:#FFFFFF;font-weight:bold;text-align:center;border:1px solid #475569;padding:6px;font-family:Arial,sans-serif;font-size:11pt;`
-  const timeStyle = `background:#334155;color:#FFFFFF;font-weight:bold;text-align:center;border:1px solid #475569;padding:4px 8px;font-family:Arial,sans-serif;font-size:10pt;white-space:nowrap;`
-  const emptyStyle = `background:#F8FAFC;border:1px solid #CBD5E1;`
-
-  let table = '<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;">'
-  table += '<thead><tr>'
-  table += `<th style="${headerStyle}">HORA</th>`
-  for (const d of dias) {
-    table += `<th style="${headerStyle}">${d.toUpperCase()}</th>`
-  }
-  table += '</tr></thead><tbody>'
-
+  // Construir datos de la hoja de horario
+  const data: (string | number)[][] = [['HORA', ...dias]]
   for (const slot of slots) {
-    table += '<tr>'
-    table += `<td style="${timeStyle}">${minToHhmm(slot)}</td>`
+    const row: (string | number)[] = [minToHhmm(slot)]
     for (const d of dias) {
-      if (skipSlots[d].has(slot)) continue
+      if (skipSlots[d].has(slot)) {
+        row.push('')
+        continue
+      }
       const key = `${d}|${slot}`
       const c = placeCell[key]
       if (!c) {
-        table += `<td style="${emptyStyle}width:140px;height:60px;">&nbsp;</td>`
+        row.push('')
       } else {
-        const color = getNrcColor(horario, c.nrc)
         const lugar = `${c.edificio ?? ''} ${c.salon ?? ''}`.trim()
         const lugarFinal = !lugar || ['n/a', 'na', '-', 's/i'].includes(lugar.toLowerCase()) ? '' : lugar
-        const cellStyle = `background:${color};border:1px solid #1E293B;color:#1E293B;padding:6px;font-family:Arial,sans-serif;font-size:9pt;vertical-align:middle;text-align:center;width:140px;height:60px;`
-        const titulo = escapeHtml(c.titulo)
-        const seccion = escapeHtml(c.seccion ?? '')
-        table += `<td bgcolor="${color}" style="${cellStyle}"><b style="font-size:10pt;">${titulo}</b><br><span style="font-size:8pt;">${c.tipo} ${seccion}</span><br><span style="font-size:8pt;">NRC ${c.nrc}</span><br><span style="font-size:9pt;font-weight:bold;">${c.hora_inicio}-${c.hora_fin}</span>${lugarFinal ? `<br><span style="font-size:7pt;">${escapeHtml(lugarFinal)}</span>` : ''}</td>`
+        const lines = [
+          c.titulo,
+          `${c.tipo} ${c.seccion}`,
+          `NRC ${c.nrc}`,
+          `${c.hora_inicio}-${c.hora_fin}`
+        ]
+        if (lugarFinal) lines.push(lugarFinal)
+        row.push(lines.join('\n'))
       }
     }
-    table += '</tr>'
+    data.push(row)
   }
-  table += '</tbody></table>'
 
+  const ws = XLSX.utils.aoa_to_sheet(data)
+
+  // Aplicar anchos de columna: primera (hora) angosta, días anchas
+  ws['!cols'] = [{ wch: 10 }, ...dias.map(() => ({ wch: 28 }))]
+  ws['!rows'] = [{ hpx: 30 }, ...slots.map(() => ({ hpx: 65 }))]
+
+  // Calcular merges verticales para clases que ocupan varios slots
+  const merges: XLSX.Range[] = []
+  for (let di = 0; di < dias.length; di++) {
+    let mergeStart = -1
+    for (let si = 0; si < slots.length; si++) {
+      const d = dias[di]
+      const slot = slots[si]
+      if (skipSlots[d].has(slot)) {
+        if (mergeStart === -1) mergeStart = si - 1
+      } else {
+        if (mergeStart !== -1) {
+          merges.push({
+            s: { r: mergeStart + 1, c: di + 1 },
+            e: { r: si, c: di + 1 }
+          })
+          mergeStart = -1
+        }
+      }
+    }
+    if (mergeStart !== -1) {
+      merges.push({
+        s: { r: mergeStart + 1, c: di + 1 },
+        e: { r: slots.length, c: di + 1 }
+      })
+    }
+  }
+  if (merges.length > 0) ws['!merges'] = merges
+
+  // Aplicar estilos celda por celda
+  const headerStyle = cellStyle('1E293B', 'FFFFFF', true, 11)
+  const timeStyle = cellStyle('334155', 'FFFFFF', true, 10)
+  const emptyStyle = cellStyle('F8FAFC', '1E293B', false, 9)
+
+  const range = XLSX.utils.decode_range(ws['!ref'] ?? 'A1')
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c })
+      if (!ws[addr]) ws[addr] = { v: '' }
+      const cell = ws[addr]
+      if (cell === undefined) continue
+
+      if (r === 0) {
+        cell.s = headerStyle
+      } else if (c === 0) {
+        cell.s = timeStyle
+      } else {
+        const dia = dias[c - 1]
+        const slot = slots[r - 1]
+        const key = `${dia}|${slot}`
+        const clase = placeCell[key]
+        if (clase) {
+          const color = getNrcColor(horario, clase.nrc)
+          cell.s = cellStyle(color, '1E293B', false, 9)
+        } else if (skipSlots[dia]?.has(slot)) {
+          // Celda dentro de un merge: no necesita estilo propio
+        } else {
+          cell.s = emptyStyle
+        }
+      }
+    }
+  }
+
+  // Hoja de leyenda
   const cursosUnicos: Array<{ titulo: string; nrc: string; tipo: string; clases: ClaseConDia[] }> = []
   const visto = new Set<string>()
   for (const c of horario) {
@@ -111,55 +198,56 @@ export function generarExcelColoreado(horario: ClaseConDia[]): string {
     cursosUnicos.push({ titulo: c.titulo, nrc: c.nrc, tipo: c.tipo, clases })
   }
 
-  let legendTable = '<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:8px;">'
-  legendTable += '<thead><tr>'
-  legendTable += `<th style="${headerStyle}">Color</th>`
-  legendTable += `<th style="${headerStyle}">Ramo</th>`
-  legendTable += `<th style="${headerStyle}">Tipo</th>`
-  legendTable += `<th style="${headerStyle}">NRC</th>`
-  legendTable += `<th style="${headerStyle}">Días y horarios</th>`
-  legendTable += '</tr></thead><tbody>'
-
+  const legendData: (string | number)[][] = [['Color', 'Ramo', 'Tipo', 'NRC', 'Dias y horarios']]
   for (const item of cursosUnicos) {
-    const color = getNrcColor(horario, item.nrc)
-    const cellStyle = `background:${color};border:1px solid #1E293B;width:40px;height:30px;`
-    const dataStyle = `border:1px solid #CBD5E1;padding:6px;font-family:Arial,sans-serif;font-size:10pt;`
     const ordenadas = [...item.clases].sort((a, b) => {
       const ordenDia = DIAS_FULL.indexOf(a.dia) - DIAS_FULL.indexOf(b.dia)
       return ordenDia !== 0 ? ordenDia : a.hora_inicio.localeCompare(b.hora_inicio)
     })
     const detalle = ordenadas.map(c => `${c.dia.substring(0, 3)} ${c.hora_inicio}-${c.hora_fin}`).join(' / ')
-    legendTable += '<tr>'
-    legendTable += `<td bgcolor="${color}" style="${cellStyle}">&nbsp;</td>`
-    legendTable += `<td style="${dataStyle}"><b>${escapeHtml(item.titulo)}</b></td>`
-    legendTable += `<td style="${dataStyle}text-align:center;">${escapeHtml(item.tipo)}</td>`
-    legendTable += `<td style="${dataStyle}text-align:center;font-family:monospace;">${escapeHtml(item.nrc)}</td>`
-    legendTable += `<td style="${dataStyle}">${escapeHtml(detalle)}</td>`
-    legendTable += '</tr>'
+    legendData.push(['', item.titulo, item.tipo, item.nrc, detalle])
   }
-  legendTable += '</tbody></table>'
 
-  const css = `
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { color: #1E293B; font-size: 18pt; margin-bottom: 4px; }
-    .subtitulo { color: #64748B; font-size: 10pt; margin-bottom: 16px; }
-  `
+  const wsLegend = XLSX.utils.aoa_to_sheet(legendData)
+  wsLegend['!cols'] = [{ wch: 8 }, { wch: 35 }, { wch: 10 }, { wch: 15 }, { wch: 50 }]
+  wsLegend['!rows'] = [{ hpx: 25 }, ...cursosUnicos.map(() => ({ hpx: 22 }))]
 
-  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-<meta charset="UTF-8">
-<style>${css}</style>
-</head>
-<body>
-<h1>Horario USS</h1>
-<p class="subtitulo">Generado por UniHorario USS · ${new Date().toLocaleDateString('es-CL')}</p>
-${table}
-<h2 style="margin-top:24px;color:#1E293B;font-size:14pt;">Leyenda de Ramos</h2>
-${legendTable}
-</body>
-</html>`
+  const legendHeaderStyle = cellStyle('1E293B', 'FFFFFF', true, 11)
+  const legendDataStyle = cellStyle(undefined, '1E293B', false, 10)
+  const legendRange = XLSX.utils.decode_range(wsLegend['!ref'] ?? 'A1')
+  for (let r = legendRange.s.r; r <= legendRange.e.r; r++) {
+    for (let c = legendRange.s.c; c <= legendRange.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c })
+      if (!wsLegend[addr]) wsLegend[addr] = { v: '' }
+      const cell = wsLegend[addr]
+      if (cell === undefined) continue
+
+      if (r === 0) {
+        cell.s = legendHeaderStyle
+      } else {
+        cell.s = legendDataStyle
+        if (c === 0) {
+          const item = cursosUnicos[r - 1]
+          if (item) {
+            const color = getNrcColor(horario, item.nrc)
+            cell.s = cellStyle(color, '1E293B', false, 10)
+          }
+        }
+      }
+    }
+  }
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Horario')
+  XLSX.utils.book_append_sheet(wb, wsLegend, 'Leyenda')
+
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as Uint8Array
 }
 
-function generarExcelVacio(): string {
-  return `<html><body><h1>Horario vacio</h1></body></html>`
+function generarExcelVacio(): Uint8Array {
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.aoa_to_sheet([['No hay clases para exportar']])
+  ws['!cols'] = [{ wch: 40 }]
+  XLSX.utils.book_append_sheet(wb, ws, 'Horario')
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as Uint8Array
 }
