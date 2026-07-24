@@ -4,7 +4,7 @@ import { useStore } from '../store'
 import ScheduleGrid, { getNrcColors } from '../components/ScheduleGrid'
 import { getCourseColors, normTipo } from '../lib/colors'
 import { cumplePreferencias } from '../lib/optimizer'
-import { ChevronLeft, ChevronRight, RotateCcw, Download, Sparkles, Calendar, AlertCircle, CheckCircle, Info } from '../icons'
+import { ChevronLeft, ChevronRight, RotateCcw, Download, Sparkles, Calendar, AlertCircle, CheckCircle, Info, Pencil } from '../icons'
 import { useNavigate } from 'react-router-dom'
 import { ClaseConDia, ExcluidoInfo } from '../types'
 
@@ -163,6 +163,20 @@ export default function SchedulePage() {
           >
             <span className="hidden sm:inline">Siguiente</span>
             <ChevronRight className="w-4 h-4" />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              const nrcs = [...new Set(horarioActual.map(c => c.nrc))]
+              store.setModoManual(true)
+              store.setManualNrcs(nrcs)
+              navigate('/process', { state: { editIndice: store.indiceHorario } })
+            }}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <Pencil className="w-4 h-4" />
+            <span className="hidden sm:inline">Editar</span>
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }}
