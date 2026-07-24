@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { HashRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
-import { StoreProvider, useStore } from './store'
+import { StoreProvider } from './store'
 import UploadPage from './pages/UploadPage'
 import CategorizePage from './pages/CategorizePage'
 import ProcessPage from './pages/ProcessPage'
@@ -90,7 +90,6 @@ function ThemeToggle() {
 }
 
 function Layout() {
-  const { toast, clearToast } = useStore()
   const location = useLocation()
 
   return (
@@ -138,34 +137,6 @@ function Layout() {
           </Routes>
         </AnimatePresence>
       </main>
-
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, x: 100, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 100, scale: 0.95 }}
-            transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-            className="fixed bottom-6 right-6 z-50 max-w-sm"
-            role="alert"
-            aria-live="polite"
-          >
-            <div className="toast glass border rounded-xl shadow-2xl p-4 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
-                <Check className="w-4 h-4 text-success" />
-              </div>
-              <p className="text-sm font-medium text-fg flex-1 pt-1">{toast}</p>
-              <button
-                onClick={clearToast}
-                className="text-muted hover:text-fg p-1 rounded-lg hover:bg-accent/50 transition-colors"
-                aria-label="Cerrar"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }

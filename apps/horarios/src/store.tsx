@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import { HorarioCrudo, ClaseConDia, SeleccionUsuario, Preferencias, CriterioHorario, JsonStoreItem, Prioridad, ExcluidoInfo } from './types'
+import Swal from 'sweetalert2'
 
 interface Store {
   // Raw data
@@ -44,9 +45,7 @@ interface Store {
   setActiveTab: (i: number) => void
   
   // Toast
-  toast: string | null
-  showToast: (msg: string) => void
-  clearToast: () => void
+  showToast: (msg: string, icon?: 'success' | 'error' | 'warning' | 'info') => void
   
   // Reset
   resetAll: () => void
@@ -68,7 +67,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [jsonStore, setJsonStore] = useState<Record<string, JsonStoreItem>>({})
   const [preferencias, setPreferencias] = useState<Preferencias>(PREF_INIT)
   const [activeTab, setActiveTab] = useState(0)
-  const [toast, setToast] = useState<string | null>(null)
   const [modoManual, setModoManual] = useState(false)
   const [manualNrcs, setManualNrcs] = useState<string[]>([])
 
@@ -108,12 +106,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3000)
+  const showToast = useCallback((msg: string, icon: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    Swal.fire({
+      icon,
+      title: msg,
+      showConfirmButton: false,
+      showCloseButton: true,
+      timer: 5000,
+      timerProgressBar: true,
+      backdrop: false,
+      allowOutsideClick: true,
+      allowEscapeKey: true,
+      customClass: {
+        popup: 'swal2-modal-custom',
+        closeButton: 'swal2-close-custom',
+        timerProgressBar: 'swal2-timer-custom'
+      }
+    })
   }, [])
-
-  const clearToast = useCallback(() => setToast(null), [])
 
   const resetAll = useCallback(() => {
     setHorariosCrudos([])
@@ -139,7 +149,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setCriterios: (c) => setPreferencias(p => ({ ...p, criterios: c })),
       modoManual, setModoManual, manualNrcs, setManualNrcs,
       activeTab, setActiveTab,
-      toast, showToast, clearToast,
+      showToast,
       resetAll
     }}>
       {children}

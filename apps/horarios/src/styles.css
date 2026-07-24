@@ -430,6 +430,105 @@
     border-color: var(--color-border-strong);
   }
 
+  /* ===== SweetAlert2 Custom Theme ===== */
+  .swal2-modal-custom {
+    background: var(--color-bg-elevated) !important;
+    border: 1px solid var(--color-border) !important;
+    color: var(--color-fg) !important;
+    box-shadow: var(--shadow-lg) !important;
+    border-radius: 1rem !important;
+    padding: 1.5rem !important;
+    max-width: 24rem !important;
+    width: auto !important;
+    overflow: hidden !important;
+  }
+  
+  .swal2-modal-custom .swal2-title {
+    color: var(--color-fg) !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    padding-top: 0.5rem !important;
+    margin-bottom: 0 !important;
+  }
+  
+  .swal2-modal-custom .swal2-icon {
+    border-color: transparent !important;
+    margin: 0.5rem auto 0 !important;
+  }
+  
+  .swal2-modal-custom .swal2-success .swal2-success-ring {
+    border-color: var(--color-success) !important;
+  }
+  
+  .swal2-modal-custom .swal2-success [class^='swal2-success-line'] {
+    background-color: var(--color-success) !important;
+  }
+  
+  .swal2-modal-custom .swal2-success .swal2-success-line-tip {
+    background-color: var(--color-success) !important;
+  }
+  
+  .swal2-modal-custom .swal2-success .swal2-success-line-long {
+    background-color: var(--color-success) !important;
+  }
+  
+  .swal2-modal-custom .swal2-error [class^='swal2-x-mark-line'] {
+    background-color: var(--color-danger) !important;
+  }
+  
+  .swal2-modal-custom .swal2-error .swal2-x-mark-line-left {
+    background-color: var(--color-danger) !important;
+  }
+  
+  .swal2-modal-custom .swal2-error .swal2-x-mark-line-right {
+    background-color: var(--color-danger) !important;
+  }
+  
+  .swal2-modal-custom .swal2-warning .swal2-warning-icon {
+    border-color: var(--color-warning) !important;
+    color: var(--color-warning) !important;
+  }
+  
+  .swal2-modal-custom .swal2-info .swal2-info-icon {
+    border-color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
+  }
+  
+  .swal2-modal-custom .swal2-progress-steps .swal2-progress-step {
+    background: var(--color-primary) !important;
+  }
+  
+  .swal2-modal-custom .swal2-progress-steps .swal2-progress-step-line {
+    background: var(--color-primary) !important;
+  }
+  
+  /* X button positioned top-right, above content */
+  .swal2-close-custom {
+    position: absolute !important;
+    top: 0.5rem !important;
+    right: 0.5rem !important;
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    font-size: 1.25rem !important;
+    color: var(--color-fg-muted) !important;
+    background: transparent !important;
+    border: none !important;
+    opacity: 1 !important;
+    transition: color 150ms ease !important;
+  }
+  
+  .swal2-close-custom:hover {
+    color: var(--color-fg) !important;
+  }
+  
+  /* Timer progress bar at bottom */
+  .swal2-timer-custom {
+    background: var(--color-primary) !important;
+    height: 3px !important;
+    border-radius: 0 0 1rem 1rem !important;
+    opacity: 0.8 !important;
+  }
+
   /* ===== Subtle card with border accent ===== */
   .glow-card {
     position: relative;

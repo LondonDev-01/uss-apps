@@ -247,7 +247,7 @@ export default function ProcessPage() {
       const candidatos = procesarSeleccionesUsuario(store.selecciones, prioridadesPorNrc)
       const resultado = generarTopHorarios(candidatos, 10, store.preferencias)
       if (resultado.horarios.length === 0) {
-        alert(resultado.mensaje)
+        store.showToast(resultado.mensaje, 'error')
         return
       }
       store.setMejoresHorarios(resultado.horarios)
