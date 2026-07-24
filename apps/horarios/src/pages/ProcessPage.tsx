@@ -84,44 +84,57 @@ export default function ProcessPage() {
     return null
   }
 
+  // Check whether two NRCs of the same titulo are compatible as a TEO/LAB pair.
+  // Same liga/conector semantics as the optimizer's consolidarOpciones.
+  const areLinked = (nrcA: string, nrcB: string, titulo: string): boolean => {
+    const a = cursosPorTitulo[titulo]?.[nrcA]?.[0]
+    const b = cursosPorTitulo[titulo]?.[nrcB]?.[0]
+    if (!a || !b) return false
+    const aLiga = a.liga?.trim() ?? ''
+    const aConn = a.conector?.trim() ?? ''
+    const bLiga = b.liga?.trim() ?? ''
+    const bConn = b.conector?.trim() ?? ''
+    if (!aLiga && !aConn && !bLiga && !bConn) return true
+    return aLiga === bConn && aConn === bLiga
+  }
+
+  const tipoOfNrc = (titulo: string, nrc: string): 'TEO' | 'LAB' | 'OTRO' | null => {
+    const blocks = cursosPorTitulo[titulo]?.[nrc]
+    return blocks && blocks.length > 0 ? normTipo(blocks[0].tipo) : null
+  }
+
   const toggleNrcManual = (nrc: string, titulo: string, tipo: string) => {
     const normT = normTipo(tipo)
     const prev = new Set(store.manualNrcs)
+    const partnerTipo = normT === 'TEO' ? 'LAB' : normT === 'LAB' ? 'TEO' : null
+
+    // Invariant: at most one NRC per titulo+tipo is ever selected, so the paired
+    // partner is simply whichever NRC of the partner type is currently selected.
+    // Never re-derive it via findLinkedNrc: liga/conector only answers
+    // compatibility, not identity of the current selection.
+    const selectedOfTitulo = [...prev].filter(n => tipoOfNrc(titulo, n) !== null)
+    const selectedPartner = partnerTipo
+      ? selectedOfTitulo.find(n => tipoOfNrc(titulo, n) === partnerTipo) ?? null
+      : null
 
     if (prev.has(nrc)) {
-      // Deselect: also deselect linked NRC
+      // Deselect: the pair stands together, so drop the selected partner too
       prev.delete(nrc)
-      if (normT === 'TEO') {
-        const linked = findLinkedNrc(nrc, titulo, 'LAB')
-        if (linked) prev.delete(linked)
-      } else if (normT === 'LAB') {
-        const linked = findLinkedNrc(nrc, titulo, 'TEO')
-        if (linked) prev.delete(linked)
-      }
+      if (selectedPartner) prev.delete(selectedPartner)
     } else {
-      // Auto-deselect other NRCs of same titulo+tipo
-      for (const n of prev) {
-        const blocks = store.horariosCrudos.filter(h => h.nrc === n)
-        if (blocks.length > 0 && blocks[0].titulo === titulo && normTipo(blocks[0].tipo) === normT) {
-          // Also deselect its linked NRC before removing
-          if (normT === 'TEO') {
-            const linked = findLinkedNrc(n, titulo, 'LAB')
-            if (linked) prev.delete(linked)
-          } else if (normT === 'LAB') {
-            const linked = findLinkedNrc(n, titulo, 'TEO')
-            if (linked) prev.delete(linked)
-          }
-          prev.delete(n)
-        }
+      // Only one section per titulo+tipo: drop the previous one of the same type
+      for (const n of selectedOfTitulo) {
+        if (tipoOfNrc(titulo, n) === normT) prev.delete(n)
       }
       prev.add(nrc)
-      // Auto-select linked NRC
-      if (normT === 'TEO') {
-        const linked = findLinkedNrc(nrc, titulo, 'LAB')
-        if (linked) prev.add(linked)
-      } else if (normT === 'LAB') {
-        const linked = findLinkedNrc(nrc, titulo, 'TEO')
-        if (linked) prev.add(linked)
+      if (partnerTipo) {
+        if (selectedPartner && areLinked(nrc, selectedPartner, titulo)) {
+          // Keep the existing partner: it is compatible with the new section
+        } else {
+          if (selectedPartner) prev.delete(selectedPartner)
+          const linked = findLinkedNrc(nrc, titulo, partnerTipo)
+          if (linked) prev.add(linked)
+        }
       }
     }
     store.setManualNrcs([...prev])
@@ -482,14 +495,14 @@ export default function ProcessPage() {
       )}
 
       {modo === 'manual' && (
-      <>
-        {/* Course NRC selection cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.13 }}
-          className="space-y-4"
-        >
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          {/* Course NRC selection cards */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.13 }}
+            className="space-y-4 min-w-0 xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto xl:rounded-2xl xl:border xl:border-border xl:p-3"
+          >
           {Object.entries(cursosPorTitulo).map(([titulo, nrcsMap], idx) => {
             const nrcEntries = Object.entries(nrcsMap)
             const teoNrcs = nrcEntries.filter(([, blocks]) => normTipo(blocks[0].tipo) === 'TEO')
@@ -523,7 +536,7 @@ export default function ProcessPage() {
                   {groups.map(([tipoLabel, entries]) => (
                     <div key={tipoLabel} className="mb-3 last:mb-0">
                       <p className="text-xs text-muted uppercase tracking-wider font-semibold mb-2">{tipoLabel}</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {entries.map(([nrc, blocks]) => {
                           const isSelected = nrcsSeleccionados.has(nrc)
                           const tipo = normTipo(blocks[0].tipo)
@@ -596,7 +609,8 @@ export default function ProcessPage() {
           })}
         </motion.div>
 
-        {/* Incomplete TEO/LAB warning */}
+        <div className="space-y-4 min-w-0 xl:sticky xl:top-6 self-start">
+          {/* Incomplete TEO/LAB warning */}
         <AnimatePresence>
           {incompletos.length > 0 && (
             <motion.div
@@ -650,22 +664,25 @@ export default function ProcessPage() {
         </AnimatePresence>
 
         {/* Schedule preview */}
-        {manualSchedule.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="card rounded-2xl overflow-hidden"
-          >
-            <div className="p-4 border-b border-border">
-              <h3 className="font-semibold text-fg flex items-center gap-2">
-                <Clock className="w-5 h-5 text-primary" />
-                Vista previa ({manualSchedule.length} {manualSchedule.length === 1 ? 'bloque' : 'bloques'})
-              </h3>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="card rounded-2xl overflow-hidden"
+        >
+          <div className="p-4 border-b border-border">
+            <h3 className="font-semibold text-fg flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              Vista previa ({manualSchedule.length} {manualSchedule.length === 1 ? 'bloque' : 'bloques'})
+            </h3>
+          </div>
+          <ScheduleGrid horario={manualSchedule} />
+          {manualSchedule.length === 0 && (
+            <div className="p-6 text-center text-sm text-muted">
+              Seleccioná NRCs para armar tu horario
             </div>
-            <ScheduleGrid horario={manualSchedule} />
-          </motion.div>
-        )}
+          )}
+        </motion.div>
 
         {/* Save button */}
         <motion.div
@@ -692,7 +709,8 @@ export default function ProcessPage() {
             Guardar horario manual
           </button>
         </motion.div>
-      </>
+      </div>
+      </div>
       )}
     </motion.div>
   )

@@ -94,6 +94,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setSelecciones({})
     setMejoresHorarios([])
     setIndiceHorario(0)
+    setExcluidosDetallados([])
     setJsonStore({})
     setManualNrcs([])
   }, [])
