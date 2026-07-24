@@ -402,7 +402,6 @@ export default function UploadPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
-  const [preview, setPreview] = useState<{ rows: string[][]; parsedCount: number; numberShown: number } | null>(null)
   const [showAll, setShowAll] = useState(false)
   const [showBreakdownModal, setShowBreakdownModal] = useState(false)
   const [processing, setProcessing] = useState(false)
@@ -414,6 +413,18 @@ export default function UploadPage() {
 
   const stats = useMemo(() => computeStats(store.horariosCrudos), [store.horariosCrudos])
 
+  const preview = useMemo(() => {
+    if (store.horariosCrudos.length === 0) return null
+    const rows = store.horariosCrudos.map(h => [
+      h.nrc, h.titulo, h.seccion, h.tipo, h.hora_str, h.dia_parseado ?? '-', h.liga || '-', h.conector || '-'
+    ])
+    return {
+      rows: [['NRC', 'Nombre', 'Seccion', 'Tipo', 'Horario', 'Dia', 'Liga', 'Conector'], ...rows],
+      parsedCount: store.horariosCrudos.length,
+      numberShown: 10,
+    }
+  }, [store.horariosCrudos])
+
   const openFileDialog = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -422,14 +433,7 @@ export default function UploadPage() {
   }
 
   const applyParsed = (parsed: HorarioCrudo[]) => {
-    const previewRows = parsed.map(h => [
-      h.nrc, h.titulo, h.seccion, h.tipo, h.hora_str, h.dia_parseado ?? '-', h.liga || '-', h.conector || '-'
-    ])
-    setPreview({
-      rows: [['NRC', 'Nombre', 'Seccion', 'Tipo', 'Horario', 'Dia', 'Liga', 'Conector'], ...previewRows],
-      parsedCount: parsed.length,
-      numberShown: 10
-    })
+    store.clearHorarios()
     store.setHorariosCrudos(parsed)
   }
 
@@ -505,11 +509,10 @@ export default function UploadPage() {
   }
 
   const clearFile = () => {
-    setPreview(null)
     setShowAll(false)
     setShowBreakdownModal(false)
     setError(null)
-    store.setHorariosCrudos([])
+    store.clearHorarios()
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
