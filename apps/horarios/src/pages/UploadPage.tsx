@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useStore } from '../store'
 import { useNavigate } from 'react-router-dom'
 import { parseExcelFile, parseExcelSheet, SheetInfo } from '../lib/excelParser'
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, ArrowRight, Trash2, HelpCircle, Loader2, X, ChevronDown, ChevronUp } from '../icons'
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, ArrowRight, Trash2, HelpCircle, Loader2, X, ChevronDown, ChevronUp, Download } from '../icons'
 import type { HorarioCrudo } from '../types'
 
 const LOADING_MESSAGES = [
@@ -570,6 +570,33 @@ export default function UploadPage() {
             Arrastra tu archivo <code className="px-1.5 py-0.5 rounded bg-surface text-fg font-mono text-sm">.xlsx</code> del portal USS o haz clic para seleccionarlo
           </motion.p>
         </motion.div>
+
+        {!preview && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="card rounded-2xl border border-border p-5 flex items-center gap-4 hover:border-fg-muted transition-colors"
+          >
+            <div className="w-12 h-12 rounded-xl bg-bg-elevated border border-border flex items-center justify-center flex-shrink-0">
+              <FileSpreadsheet className="w-6 h-6 text-fg-muted" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-fg">¿No tenés el archivo?</p>
+              <p className="text-xs text-muted mt-0.5">Descargá el Excel del portal USS y luego subilo acá</p>
+            </div>
+            <motion.a
+              href="/excels/horarios.xlsx"
+              download
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold flex-shrink-0"
+            >
+              <Download className="w-4 h-4" />
+              Descargar
+            </motion.a>
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 10 }}
