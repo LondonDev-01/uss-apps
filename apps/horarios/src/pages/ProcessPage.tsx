@@ -6,7 +6,7 @@ import { procesarSeleccionesUsuario, generarTopHorarios, horarioCrudoToClase, ve
 import { normTipo } from '../lib/colors'
 import ScheduleGrid from '../components/ScheduleGrid'
 import { ChevronRight, Trash2, AlertTriangle, Loader2, Sparkles, Sun, Moon, Clock, CheckCircle, Zap, Settings, AlertCircle } from '../icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { CRITERIO_LABELS, CRITERIO_ORDER, CriterioHorario, HorarioCrudo, ClaseConDia } from '../types'
 
 const DIAS_OPCIONES = ['Seleccionar', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
@@ -27,6 +27,11 @@ const BADGE_CLASSES = {
 export default function ProcessPage() {
   const store = useStore()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const editIndice = typeof location.state === 'object' && location.state !== null
+    ? (location.state as { editIndice?: number }).editIndice ?? null
+    : null
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -171,10 +176,18 @@ export default function ProcessPage() {
       store.showToast('Hay conflictos en el horario: ' + conflictoMsg)
       return
     }
-    store.setMejoresHorarios([manualSchedule])
-    store.setIndiceHorario(0)
+    if (editIndice !== null && editIndice >= 0 && editIndice < store.mejoresHorarios.length) {
+      const horarios = [...store.mejoresHorarios]
+      horarios[editIndice] = manualSchedule
+      store.setMejoresHorarios(horarios)
+      store.setIndiceHorario(editIndice)
+      store.showToast('¡Horario actualizado!')
+    } else {
+      store.setMejoresHorarios([manualSchedule])
+      store.setIndiceHorario(0)
+      store.showToast('¡Horario manual guardado!')
+    }
     store.setExcluidosDetallados([])
-    store.showToast('¡Horario manual guardado!')
     window.scrollTo({ top: 0, behavior: 'instant' })
     navigate('/schedule')
   }
