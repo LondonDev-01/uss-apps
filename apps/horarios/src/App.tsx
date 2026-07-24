@@ -7,7 +7,8 @@ import CategorizePage from './pages/CategorizePage'
 import ProcessPage from './pages/ProcessPage'
 import SchedulePage from './pages/SchedulePage'
 import ExportPage from './pages/ExportPage'
-import { Calendar, ClipboardList, Layers, Download, Check, X, Sun, Moon } from './icons'
+import ExcelsPage from './pages/ExcelsPage'
+import { Calendar, ClipboardList, Layers, Download, FileSpreadsheet, Check, X, Sun, Moon } from './icons'
 
 const TABS = [
   { path: '/', label: 'Ramos', icon: ClipboardList },
@@ -15,6 +16,7 @@ const TABS = [
   { path: '/process', label: 'Procesar', icon: Calendar },
   { path: '/schedule', label: 'Horario', icon: Calendar },
   { path: '/export', label: 'Exportar', icon: Download },
+  { path: '/excels', label: 'Descargar', icon: FileSpreadsheet },
 ] as const
 
 function TabButton({ tab, isActive }: { tab: typeof TABS[number]; isActive: boolean }) {
@@ -135,6 +137,7 @@ function Layout() {
             <Route path="/process" element={<ProcessPage />} />
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/export" element={<ExportPage />} />
+            <Route path="/excels" element={<ExcelsPage />} />
           </Routes>
         </AnimatePresence>
       </main>
