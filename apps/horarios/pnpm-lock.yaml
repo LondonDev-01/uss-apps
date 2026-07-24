@@ -20,6 +20,9 @@ importers:
       react-router-dom:
         specifier: ^7.1.0
         version: 7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      sweetalert2:
+        specifier: ^11.26.25
+        version: 11.26.25
       xlsx:
         specifier: ^0.18.5
         version: 0.18.5
@@ -948,6 +951,9 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
+  sweetalert2@11.26.25:
+    resolution: {integrity: sha512-+hunCOJdJ6FLj04T9YSLvvZXRjsvIkTeTKP2e4VF8CaBias961BTnWiSFAy7F/CM5eq3QK2Rraoc5Gzftslvkg==}
+
   tailwindcss@3.4.19:
     resolution: {integrity: sha512-3ofp+LL8E+pK/JuPLPggVAIaEuhvIz4qNcf3nA1Xn2o/7fb7s/TYpHhwGDv1ZU3PkBluUVaF8PyCHcm48cKLWQ==}
     engines: {node: '>=14.0.0'}
@@ -1794,6 +1800,8 @@ snapshots:
       ts-interface-checker: 0.1.13
 
   supports-preserve-symlinks-flag@1.0.0: {}
+
+  sweetalert2@11.26.25: {}
 
   tailwindcss@3.4.19:
     dependencies:
