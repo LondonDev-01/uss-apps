@@ -3,7 +3,10 @@ import { getNrcColor, normTipo } from './colors'
 import * as XLSX from 'xlsx-js-style'
 
 const DIAS_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-const DURACION_BLOQUE = 80
+
+// Bloques USS fijos (misma grilla que ScheduleGrid.tsx)
+const USS_SLOTS = ['08:00', '09:30', '11:00', '12:30', '13:11', '14:40', '16:00', '17:35', '19:00']
+const USS_SLOT_MIN = USS_SLOTS.map(hhmmToMin)
 
 function hhmmToMin(s: string): number {
   const [h, m] = s.split(':').map(Number)
@@ -14,6 +17,10 @@ function minToHhmm(m: number): string {
   const h = Math.floor(m / 60)
   const mm = m % 60
   return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
+function slotEnd(idx: number): number {
+  return idx < USS_SLOT_MIN.length - 1 ? USS_SLOT_MIN[idx + 1] : Infinity
 }
 
 function toRgb(hex: string): string {
@@ -58,21 +65,23 @@ export function generarExcelColoreado(horario: ClaseConDia[]): Uint8Array {
 
   const inicioMin = Math.min(...horario.map(c => hhmmToMin(c.hora_inicio)))
   const finMax = Math.max(...horario.map(c => hhmmToMin(c.hora_fin)))
-  const slots: number[] = []
-  for (let t = inicioMin; t < finMax; t += DURACION_BLOQUE) {
-    slots.push(t)
-  }
-  if (slots.length === 0) slots.push(inicioMin)
 
-  // Encontrar qué clase va en cada celda del grid (slot x día)
+  // Filtrar slots USS que solapen con el rango de clases
+  const slots = USS_SLOT_MIN.filter((m, i) => m < finMax && slotEnd(i) > inicioMin)
+  if (slots.length === 0) slots.push(...USS_SLOT_MIN.filter(m => m >= inicioMin && m < finMax))
+  if (slots.length === 0) slots.push(USS_SLOT_MIN[USS_SLOT_MIN.length - 1])
+
+  // Encontrar qué clase va en cada celda del grid (slot x día) — overlap real, no 80-min fijo
   const placeCell: Record<string, ClaseConDia | null> = {}
   for (const d of dias) {
-    for (const slot of slots) {
+    for (let si = 0; si < slots.length; si++) {
+      const slot = slots[si]
+      const sEnd = slotEnd(USS_SLOT_MIN.indexOf(slot))
       const found = horario.find(c => {
         if (c.dia !== d) return false
         const ci = hhmmToMin(c.hora_inicio)
         const cf = hhmmToMin(c.hora_fin)
-        return ci <= slot && slot < cf
+        return ci < sEnd && cf > slot
       })
       const key = `${d}|${slot}`
       if (!placeCell[key]) placeCell[key] = found ?? null
@@ -85,8 +94,17 @@ export function generarExcelColoreado(horario: ClaseConDia[]): Uint8Array {
   for (const c of horario) {
     const ci = hhmmToMin(c.hora_inicio)
     const cf = hhmmToMin(c.hora_fin)
-    for (let t = ci + DURACION_BLOQUE; t < cf; t += DURACION_BLOQUE) {
-      if (slots.includes(t)) skipSlots[c.dia].add(t)
+    let firstFound = false
+    for (let si = 0; si < slots.length; si++) {
+      const slot = slots[si]
+      const sEnd = slotEnd(USS_SLOT_MIN.indexOf(slot))
+      if (ci < sEnd && cf > slot) {
+        if (!firstFound) {
+          firstFound = true
+        } else {
+          skipSlots[c.dia].add(slot)
+        }
+      }
     }
   }
 
