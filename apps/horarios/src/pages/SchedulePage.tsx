@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useEffect, useMemo } from 'react'
+import Swal from 'sweetalert2'
 import { useStore } from '../store'
 import ScheduleGrid, { getNrcColors } from '../components/ScheduleGrid'
 import { getCourseColors, normTipo } from '../lib/colors'
@@ -77,10 +78,25 @@ export default function SchedulePage() {
   }, [horarioActual, store.horariosCrudos, titulosEnHorario])
 
   const reiniciar = () => {
-    if (confirm('¿Reiniciar todo y perder los datos?')) {
-      store.resetAll()
-      navigate('/')
-    }
+    Swal.fire({
+      icon: 'warning',
+      title: '¿Reiniciar todo?',
+      text: 'Se perderán todos los datos cargados.',
+      showCancelButton: true,
+      confirmButtonText: 'Reiniciar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#EF4444',
+      reverseButtons: true,
+      backdrop: false,
+      customClass: {
+        popup: 'swal2-modal-custom',
+      }
+    }).then(res => {
+      if (res.isConfirmed) {
+        store.resetAll()
+        navigate('/')
+      }
+    })
   }
 
   return (

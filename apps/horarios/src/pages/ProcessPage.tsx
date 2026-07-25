@@ -165,15 +165,15 @@ export default function ProcessPage() {
 
   const guardarManual = () => {
     if (manualSchedule.length === 0) {
-      store.showToast('Selecciona al menos un NRC')
+      store.showToast('Selecciona al menos un NRC', 'info')
       return
     }
     if (incompletos.length > 0) {
-      store.showToast('Hay ramos con TEO/LAB incompletos')
+      store.showToast('Hay ramos con TEO/LAB incompletos', 'info')
       return
     }
     if (!conflictoValido) {
-      store.showToast('Hay conflictos en el horario: ' + conflictoMsg)
+      store.showToast('Hay conflictos en el horario: ' + conflictoMsg, 'warning')
       return
     }
     if (editIndice !== null && editIndice >= 0 && editIndice < store.mejoresHorarios.length) {
@@ -227,14 +227,14 @@ export default function ProcessPage() {
       if (!k.startsWith(`${nrc}_`)) nuevasSel[k] = v
     }
     store.setSelecciones(nuevasSel)
-    store.showToast(`NRC ${nrc} eliminado`)
+    store.showToast(`NRC ${nrc} eliminado`, 'info')
   }
 
   const optimizar = async () => {
     const totalBloques = store.horariosCrudos.length
     const configurados = Object.keys(store.selecciones).length
     if (configurados < totalBloques) {
-      store.showToast('Asigna día a todos los bloques antes de optimizar')
+      store.showToast('Asigna día a todos los bloques antes de optimizar', 'info')
       return
     }
 
@@ -258,7 +258,7 @@ export default function ProcessPage() {
       navigate('/schedule')
     } catch (e) {
       console.error(e)
-      store.showToast('Error al optimizar')
+      store.showToast('Error al optimizar', 'error')
     } finally {
       setOptimizing(false)
     }
@@ -270,7 +270,7 @@ export default function ProcessPage() {
       store.setCriterios(current.filter(x => x !== c))
     } else {
       if (current.length >= 2) {
-        store.showToast('Máximo 2 criterios. Quita uno para añadir otro.')
+        store.showToast('Máximo 2 criterios. Quita uno para añadir otro.', 'warning')
         return
       }
       store.setCriterios([...current, c])
