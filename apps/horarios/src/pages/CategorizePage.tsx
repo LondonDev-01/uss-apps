@@ -82,7 +82,7 @@ export default function CategorizePage() {
       if (!nrcsAEliminar.has(v.nrc_original)) nuevasSel[k] = v
     }
     store.setSelecciones(nuevasSel)
-    store.showToast(`"${titulo}" eliminado`)
+    store.showToast(`"${titulo}" eliminado`, 'info')
   }
 
   const handleProceed = async () => {

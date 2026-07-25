@@ -107,12 +107,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const showToast = useCallback((msg: string, icon: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    const TIMERS = { success: 1500, info: 2500, warning: 4000, error: 5000 }
     Swal.fire({
       icon,
       title: msg,
       showConfirmButton: false,
       showCloseButton: true,
-      timer: 5000,
+      timer: TIMERS[icon],
       timerProgressBar: true,
       backdrop: false,
       allowOutsideClick: true,
