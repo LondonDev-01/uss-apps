@@ -215,6 +215,7 @@ export default function CategorizePage() {
                     <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-bg-elevated">{h.seccion}</span>
                     <span className="text-xs">{h.tipo}</span>
                     <span className="text-xs">{h.hora_str}</span>
+                    <span className="text-xs text-fg/70 italic">{h.instructor}</span>
                     {h.dia_parseado && (
                       <span className="flex items-center gap-1 text-xs font-semibold text-success">
                         <CheckCircle className="w-3.5 h-3.5" />

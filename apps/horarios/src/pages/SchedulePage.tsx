@@ -282,6 +282,7 @@ export default function SchedulePage() {
                         </span>
                         <span className="font-mono">NRC {nrc}</span>
                       </div>
+                      <div className="text-[11px] text-fg/60 italic mt-0.5 truncate">{info.clases[0].instructor}</div>
                       <div className="text-[11px] text-fg mt-1 font-medium">
                         {info.clases.length} {info.clases.length === 1 ? 'clase' : 'clases'}{' '}
                         <span className="text-muted">·</span>{' '}

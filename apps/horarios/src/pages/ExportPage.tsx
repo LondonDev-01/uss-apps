@@ -6,20 +6,20 @@ import { Download, FileSpreadsheet, FileCode, CalendarClock, ChevronDown, Loader
 import { generarExcelColoreado } from '../lib/excelExport'
 
 function generarCSV(horario: ClaseConDia[]): string {
-  const grouped: Record<string, { nrc: string; titulo: string; tipo: string; bloques: string[] }> = {}
+  const grouped: Record<string, { nrc: string; titulo: string; tipo: string; instructor: string; bloques: string[] }> = {}
   for (const c of horario) {
     const key = `${c.nrc}|${c.titulo}|${c.tipo}`
     const lugar = `${c.edificio ?? ''} ${c.salon ?? ''}`.trim()
     const lugarFinal = ['n/a', 'na', '-', 's/i'].includes(lugar.toLowerCase()) ? '' : lugar
     const bloque = `${c.dia} ${c.hora_inicio}-${c.hora_fin}${lugarFinal ? ' ' + lugarFinal : ''}`
-    if (!grouped[key]) grouped[key] = { nrc: c.nrc, titulo: c.titulo, tipo: c.tipo, bloques: [] }
+    if (!grouped[key]) grouped[key] = { nrc: c.nrc, titulo: c.titulo, tipo: c.tipo, instructor: c.instructor, bloques: [] }
     grouped[key].bloques.push(bloque)
   }
 
   const lines: string[] = []
-  lines.push('NRC,Titulo,Tipo,Bloque 1,Bloque 2,Bloque 3')
+  lines.push('NRC,Titulo,Tipo,Instructor,Bloque 1,Bloque 2,Bloque 3')
   for (const g of Object.values(grouped)) {
-    const row = [g.nrc, g.titulo, g.tipo, ...[0, 1, 2].map(i => g.bloques[i] ?? '')]
+    const row = [g.nrc, g.titulo, g.tipo, g.instructor, ...[0, 1, 2].map(i => g.bloques[i] ?? '')]
     lines.push(row.map(v => `"${v.replace(/"/g, '""')}"`).join(','))
   }
 
@@ -51,9 +51,20 @@ function generarCSV(horario: ClaseConDia[]): string {
 function generarJSON(horario: ClaseConDia[]): string {
   return JSON.stringify(horario.map(c => ({
     nrc: c.nrc, titulo: c.titulo, tipo: c.tipo, seccion: c.seccion,
+    instructor: c.instructor,
     dia: c.dia, hora: `${c.hora_inicio} - ${c.hora_fin}`,
     lugar: `${c.edificio} ${c.salon}`
   })), null, 2)
+}
+
+function primerDiaClase(fechaInicio: string, diaSemana: string): string {
+  const diasSemana: Record<string, number> = { Lunes: 1, Martes: 2, Miércoles: 3, Jueves: 4, Viernes: 5, Sábado: 6 }
+  const [dd, mm, yyyy] = fechaInicio.split('-').map(Number)
+  const start = new Date(yyyy, mm - 1, dd)
+  const targetDay = diasSemana[diaSemana] ?? 1
+  const diff = (targetDay - start.getDay() + 7) % 7
+  start.setDate(start.getDate() + diff)
+  return `${start.getFullYear()}${String(start.getMonth() + 1).padStart(2, '0')}${String(start.getDate()).padStart(2, '0')}`
 }
 
 function generarICal(horario: ClaseConDia[]): string {
@@ -68,7 +79,7 @@ function generarICal(horario: ClaseConDia[]): string {
     ical += `SUMMARY:${c.titulo} (${c.tipo})\n`
     ical += `LOCATION:${c.edificio} ${c.salon}\n`
     ical += `DESCRIPTION:NRC: ${c.nrc} | Sección: ${c.seccion} | Instructor: ${c.instructor}\n`
-    const startDate = c.fecha_inicio.split('-').reverse().join('')
+    const startDate = primerDiaClase(c.fecha_inicio, c.dia)
     const endDate = c.fecha_fin.split('-').reverse().join('')
     ical += `DTSTART;TZID=America/Santiago:${startDate}T${c.hora_inicio.replace(':', '')}00\n`
     ical += `DTEND;TZID=America/Santiago:${startDate}T${c.hora_fin.replace(':', '')}00\n`
