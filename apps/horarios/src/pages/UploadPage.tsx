@@ -582,8 +582,8 @@ export default function UploadPage() {
               <FileSpreadsheet className="w-6 h-6 text-fg-muted" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-fg">¿No tenés el archivo?</p>
-              <p className="text-xs text-muted mt-0.5">Descargá el Excel del portal USS y luego subilo acá</p>
+              <p className="text-sm font-bold text-fg">¿No tienes el archivo?</p>
+              <p className="text-xs text-muted mt-0.5">Descarga el Excel de ICIF entregado por nuestra jefa de carrera y luego subelo acá</p>
             </div>
             <motion.a
               href="/excels/horarios.xlsx"
