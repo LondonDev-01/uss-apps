@@ -1,4 +1,5 @@
 import { HorarioCrudo } from '../types'
+import { SEMESTRE_INICIO, SEMESTRE_FIN } from './constants'
 
 const MAPPING_EN: Record<string, string> = { M: 'Lunes', T: 'Martes', W: 'Miércoles', R: 'Jueves', F: 'Viernes', S: 'Sábado', U: 'Domingo' }
 const MAPPING_ES: Record<string, string> = { L: 'Lunes', M: 'Martes', X: 'Miércoles', W: 'Miércoles', J: 'Jueves', V: 'Viernes', S: 'Sábado', D: 'Domingo' }
@@ -78,7 +79,7 @@ function parsearJson(texto: string, prioridad: number): HorarioCrudo[] {
 
     if (Array.isArray(secciones)) {
       for (const sec of secciones) {
-        const diaJson = sec.dia ? sec.dia.toString().trim() : calcularDiaDeFecha(sec.fecha_inicio || '02-03-2026')
+        const diaJson = sec.dia ? sec.dia.toString().trim() : calcularDiaDeFecha(sec.fecha_inicio || SEMESTRE_INICIO)
         const horaNorm = normHora(sec.hora)
         const nrcVal = (sec.nrc || sec.seccion || '').toString().trim().toUpperCase()
         const seccionVal = (sec.seccion || 'T01').toString().trim().toUpperCase()
@@ -94,8 +95,8 @@ function parsearJson(texto: string, prioridad: number): HorarioCrudo[] {
           cupos_disponibles: 0,
           cupos_totales: 0,
           es_ligado: false,
-          fecha_inicio: sec.fecha_inicio || '02-03-2026',
-          fecha_fin: sec.fecha_fin || '11-07-2026',
+          fecha_inicio: sec.fecha_inicio || SEMESTRE_INICIO,
+          fecha_fin: sec.fecha_fin || SEMESTRE_FIN,
           dia_parseado: diaJson,
           prioridad,
           liga: '',
@@ -103,7 +104,7 @@ function parsearJson(texto: string, prioridad: number): HorarioCrudo[] {
         })
       }
     } else {
-      const diaJson = item.dia ? item.dia.toString().trim() : calcularDiaDeFecha(item.fecha_inicio || '02-03-2026')
+      const diaJson = item.dia ? item.dia.toString().trim() : calcularDiaDeFecha(item.fecha_inicio || SEMESTRE_INICIO)
       const horaNorm = normHora(item.hora)
       const nrcVal = (item.nrc || item.seccion || '').toString().trim().toUpperCase()
       const seccionVal = (item.seccion || 'T01').toString().trim().toUpperCase()
@@ -119,8 +120,8 @@ function parsearJson(texto: string, prioridad: number): HorarioCrudo[] {
         cupos_disponibles: 0,
         cupos_totales: 0,
         es_ligado: false,
-        fecha_inicio: item.fecha_inicio || '02-03-2026',
-        fecha_fin: item.fecha_fin || '11-07-2026',
+        fecha_inicio: item.fecha_inicio || SEMESTRE_INICIO,
+        fecha_fin: item.fecha_fin || SEMESTRE_FIN,
         dia_parseado: diaJson,
         prioridad,
         liga: '',
@@ -149,7 +150,7 @@ function parsearTabular(texto: string, prioridad: number): HorarioCrudo[] {
       const s = seg.trim().toUpperCase()
       if (s in mapping) { diaDetectado = mapping[s]; break }
     }
-    if (!diaDetectado) diaDetectado = calcularDiaDeFecha(fIni || '02-03-2026')
+    if (!diaDetectado) diaDetectado = calcularDiaDeFecha(fIni || SEMESTRE_INICIO)
 
     resultados.push({
       nrc,
@@ -163,8 +164,8 @@ function parsearTabular(texto: string, prioridad: number): HorarioCrudo[] {
       cupos_disponibles: vac && /^\d+$/.test(vac) ? parseInt(vac) : 0,
       cupos_totales: vac && /^\d+$/.test(vac) ? parseInt(vac) : 0,
       es_ligado: liga.trim().length > 0,
-      fecha_inicio: fIni || '02-03-2026',
-      fecha_fin: fFin || '11-07-2026',
+      fecha_inicio: fIni || SEMESTRE_INICIO,
+      fecha_fin: fFin || SEMESTRE_FIN,
       dia_parseado: diaDetectado,
       prioridad,
       liga: liga.trim(),

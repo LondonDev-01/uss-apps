@@ -57,6 +57,16 @@ function generarJSON(horario: ClaseConDia[]): string {
   })), null, 2)
 }
 
+function primerDiaClase(fechaInicio: string, diaSemana: string): string {
+  const diasSemana: Record<string, number> = { Lunes: 1, Martes: 2, Miércoles: 3, Jueves: 4, Viernes: 5, Sábado: 6 }
+  const [dd, mm, yyyy] = fechaInicio.split('-').map(Number)
+  const start = new Date(yyyy, mm - 1, dd)
+  const targetDay = diasSemana[diaSemana] ?? 1
+  const diff = (targetDay - start.getDay() + 7) % 7
+  start.setDate(start.getDate() + diff)
+  return `${start.getFullYear()}${String(start.getMonth() + 1).padStart(2, '0')}${String(start.getDate()).padStart(2, '0')}`
+}
+
 function generarICal(horario: ClaseConDia[]): string {
   const diasMap: Record<string, string> = { Lunes: 'MO', Martes: 'TU', Miércoles: 'WE', Jueves: 'TH', Viernes: 'FR', Sábado: 'SA' }
   const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
@@ -69,7 +79,7 @@ function generarICal(horario: ClaseConDia[]): string {
     ical += `SUMMARY:${c.titulo} (${c.tipo})\n`
     ical += `LOCATION:${c.edificio} ${c.salon}\n`
     ical += `DESCRIPTION:NRC: ${c.nrc} | Sección: ${c.seccion} | Instructor: ${c.instructor}\n`
-    const startDate = c.fecha_inicio.split('-').reverse().join('')
+    const startDate = primerDiaClase(c.fecha_inicio, c.dia)
     const endDate = c.fecha_fin.split('-').reverse().join('')
     ical += `DTSTART;TZID=America/Santiago:${startDate}T${c.hora_inicio.replace(':', '')}00\n`
     ical += `DTEND;TZID=America/Santiago:${startDate}T${c.hora_fin.replace(':', '')}00\n`
