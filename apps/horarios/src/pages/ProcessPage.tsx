@@ -435,6 +435,7 @@ export default function ProcessPage() {
                     </span>
                     <span className="text-xs text-muted font-mono bg-bg px-2 py-0.5 rounded">NRC: {nrc}</span>
                     <span className="text-xs text-muted font-mono bg-bg px-2 py-0.5 rounded">{h.seccion}</span>
+                    <span className="text-xs text-muted italic bg-bg px-2 py-0.5 rounded">{h.instructor}</span>
                     <span className={`badge text-xs px-2 py-0.5 rounded-full font-medium ${BADGE_CLASSES[configurado ? 'success' : 'warning']}`}>
                       {statusText}
                     </span>
@@ -588,6 +589,7 @@ export default function ProcessPage() {
                                   <span className="text-xs text-muted font-mono">{blocks[0].seccion}</span>
                                 </div>
                               </div>
+                              <p className="text-[11px] text-fg/60 italic mb-1.5 truncate">{blocks[0].instructor}</p>
                               <div className="space-y-0.5">
                                 {blocks.map((b, bi) => (
                                   <p key={bi} className="text-xs text-fg/80">
