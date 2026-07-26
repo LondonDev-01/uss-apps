@@ -1,5 +1,6 @@
 import { HorarioCrudo } from '../types'
 import * as XLSX from 'xlsx'
+import { SEMESTRE_INICIO, SEMESTRE_FIN } from './constants'
 
 // Detección de día: las columnas LUNES/MARTES/etc. contienen una letra.
 // Estrategia robusta: detectar qué columna tiene valor y usar el nombre de la columna.
@@ -158,8 +159,8 @@ export function parseExcelToHorarioCrudo(data: unknown[][]): HorarioCrudo[] {
       cupos_disponibles: 0,
       cupos_totales: 0,
       es_ligado: !!liga,
-      fecha_inicio: '02-03-2026',
-      fecha_fin: '11-07-2026',
+      fecha_inicio: SEMESTRE_INICIO,
+      fecha_fin: SEMESTRE_FIN,
       dia_parseado: diaParseado,
       prioridad: 0,
       liga,

@@ -416,10 +416,10 @@ export default function UploadPage() {
   const preview = useMemo(() => {
     if (store.horariosCrudos.length === 0) return null
     const rows = store.horariosCrudos.map(h => [
-      h.nrc, h.titulo, h.seccion, h.tipo, h.hora_str, h.dia_parseado ?? '-', h.liga || '-', h.conector || '-'
+      h.nrc, h.titulo, h.instructor, h.seccion, h.tipo, h.hora_str, h.dia_parseado ?? '-', h.liga || '-', h.conector || '-'
     ])
     return {
-      rows: [['NRC', 'Nombre', 'Seccion', 'Tipo', 'Horario', 'Dia', 'Liga', 'Conector'], ...rows],
+      rows: [['NRC', 'Nombre', 'Profesor', 'Seccion', 'Tipo', 'Horario', 'Dia', 'Liga', 'Conector'], ...rows],
       parsedCount: store.horariosCrudos.length,
       numberShown: 10,
     }
