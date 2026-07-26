@@ -6,20 +6,20 @@ import { Download, FileSpreadsheet, FileCode, CalendarClock, ChevronDown, Loader
 import { generarExcelColoreado } from '../lib/excelExport'
 
 function generarCSV(horario: ClaseConDia[]): string {
-  const grouped: Record<string, { nrc: string; titulo: string; tipo: string; bloques: string[] }> = {}
+  const grouped: Record<string, { nrc: string; titulo: string; tipo: string; instructor: string; bloques: string[] }> = {}
   for (const c of horario) {
     const key = `${c.nrc}|${c.titulo}|${c.tipo}`
     const lugar = `${c.edificio ?? ''} ${c.salon ?? ''}`.trim()
     const lugarFinal = ['n/a', 'na', '-', 's/i'].includes(lugar.toLowerCase()) ? '' : lugar
     const bloque = `${c.dia} ${c.hora_inicio}-${c.hora_fin}${lugarFinal ? ' ' + lugarFinal : ''}`
-    if (!grouped[key]) grouped[key] = { nrc: c.nrc, titulo: c.titulo, tipo: c.tipo, bloques: [] }
+    if (!grouped[key]) grouped[key] = { nrc: c.nrc, titulo: c.titulo, tipo: c.tipo, instructor: c.instructor, bloques: [] }
     grouped[key].bloques.push(bloque)
   }
 
   const lines: string[] = []
-  lines.push('NRC,Titulo,Tipo,Bloque 1,Bloque 2,Bloque 3')
+  lines.push('NRC,Titulo,Tipo,Instructor,Bloque 1,Bloque 2,Bloque 3')
   for (const g of Object.values(grouped)) {
-    const row = [g.nrc, g.titulo, g.tipo, ...[0, 1, 2].map(i => g.bloques[i] ?? '')]
+    const row = [g.nrc, g.titulo, g.tipo, g.instructor, ...[0, 1, 2].map(i => g.bloques[i] ?? '')]
     lines.push(row.map(v => `"${v.replace(/"/g, '""')}"`).join(','))
   }
 
@@ -51,6 +51,7 @@ function generarCSV(horario: ClaseConDia[]): string {
 function generarJSON(horario: ClaseConDia[]): string {
   return JSON.stringify(horario.map(c => ({
     nrc: c.nrc, titulo: c.titulo, tipo: c.tipo, seccion: c.seccion,
+    instructor: c.instructor,
     dia: c.dia, hora: `${c.hora_inicio} - ${c.hora_fin}`,
     lugar: `${c.edificio} ${c.salon}`
   })), null, 2)

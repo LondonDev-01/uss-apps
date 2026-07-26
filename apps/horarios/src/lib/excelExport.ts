@@ -216,18 +216,18 @@ export function generarExcelColoreado(horario: ClaseConDia[]): Uint8Array {
     cursosUnicos.push({ titulo: c.titulo, nrc: c.nrc, tipo: c.tipo, clases })
   }
 
-  const legendData: (string | number)[][] = [['Color', 'Ramo', 'Tipo', 'NRC', 'Dias y horarios']]
+  const legendData: (string | number)[][] = [['Color', 'Ramo', 'Tipo', 'NRC', 'Profesor', 'Dias y horarios']]
   for (const item of cursosUnicos) {
     const ordenadas = [...item.clases].sort((a, b) => {
       const ordenDia = DIAS_FULL.indexOf(a.dia) - DIAS_FULL.indexOf(b.dia)
       return ordenDia !== 0 ? ordenDia : a.hora_inicio.localeCompare(b.hora_inicio)
     })
     const detalle = ordenadas.map(c => `${c.dia.substring(0, 3)} ${c.hora_inicio}-${c.hora_fin}`).join(' / ')
-    legendData.push(['', item.titulo, item.tipo, item.nrc, detalle])
+    legendData.push(['', item.titulo, item.tipo, item.nrc, item.clases[0].instructor, detalle])
   }
 
   const wsLegend = XLSX.utils.aoa_to_sheet(legendData)
-  wsLegend['!cols'] = [{ wch: 8 }, { wch: 35 }, { wch: 10 }, { wch: 15 }, { wch: 50 }]
+  wsLegend['!cols'] = [{ wch: 8 }, { wch: 35 }, { wch: 10 }, { wch: 15 }, { wch: 25 }, { wch: 50 }]
   wsLegend['!rows'] = [{ hpx: 25 }, ...cursosUnicos.map(() => ({ hpx: 22 }))]
 
   const legendHeaderStyle = cellStyle('1E293B', 'FFFFFF', true, 11)
