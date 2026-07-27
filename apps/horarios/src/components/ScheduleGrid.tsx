@@ -3,7 +3,7 @@ import { ClaseConDia } from '../types'
 import { getNrcColors, normTipo } from '../lib/colors'
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-const SLOTS = ['08:00', '09:30', '11:00', '12:30', '13:11', '14:40', '16:00', '17:35', '19:00']
+const SLOTS = ['08:00', '09:30', '11:00', '12:30', '13:10', '14:40', '16:00', '17:35', '19:00']
 
 function hhmmToMin(s: string): number {
   try {
