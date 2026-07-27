@@ -344,7 +344,7 @@ export function generarTopHorarios(
   }
 
   const layoutCore = (h: ClaseConDia[]) =>
-    new Set(h.map(c => `${c.titulo}|${c.dia}|${c.hora_inicio}|${c.hora_fin}`))
+    new Set(h.map(c => `${c.nrc}|${c.dia}|${c.hora_inicio}|${c.hora_fin}`))
 
   for (const [, h] of validos) {
     const signature = [...new Set(h.map(c => c.nrc))].sort().join('|')
