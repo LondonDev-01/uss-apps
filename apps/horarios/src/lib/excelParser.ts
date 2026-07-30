@@ -84,6 +84,7 @@ export function parseExcelToHorarioCrudo(data: unknown[][]): HorarioCrudo[] {
   const hrFinIdx = findColIdx(headers, ['hr_fin', 'h_fin'])
   const nombreProfIdx = findColIdx(headers, ['nombre_'])
   const apellidoProfIdx = findColIdx(headers, ['apellido'])
+  const icifIdx = findColIdx(headers, ['icif'])
   
   // Construir mapa de día -> índice de columna
   const diaColMap: Record<string, number> = {}
@@ -103,6 +104,11 @@ export function parseExcelToHorarioCrudo(data: unknown[][]): HorarioCrudo[] {
     const nrc = String(row[nrcIdx] || '').trim()
     const titulo = String(row[nombreIdx] || '').trim().toUpperCase()
     if (!nrc || !titulo) continue
+
+    if (icifIdx >= 0) {
+      const icifVal = String(row[icifIdx] || '').trim().toLowerCase()
+      if (icifVal !== 'x' && icifVal !== '✓') continue
+    }
     
     const tipoRaw = String(row[componenteIdx] || '').trim().toUpperCase()
     const tipo = tipoRaw.includes('TEO') ? 'TEO'
