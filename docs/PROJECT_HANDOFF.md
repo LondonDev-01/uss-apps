@@ -1,5 +1,7 @@
 # UniHorario USS — Documentación de Proyecto
 
+> **⚠️ PLAN V2 EN DESARROLLO**: Ver `docs/PLAN_V2.md` para la especificación completa del v2 (backend, auth, prioridad automática, malla interactiva). Este documento describe el **v1 actual** (client-side, prioridades manuales).
+
 ## Visión General
 
 App web (Electron + React + TypeScript + Tailwind CSS) que optimiza horarios universitarios para estudiantes de la USS. El usuario sube un Excel del portal USS, categoriza ramos por prioridad, asigna días a cada bloque, y el optimizer genera las mejores combinaciones de horario.
