@@ -2,6 +2,7 @@
 
 > **Estado**: Borrador — sujeto a cambios según feedback del profe Hugo Galaz
 > **Última actualización**: 2026-08-03
+> **⚠️ Ver también**: `docs/PLAN_V3.md` — spec de PLATAFORMA del ecosistema (monorepo, hub, contratos OpenAPI, auth, deploy). Este documento sigue siendo la spec FUNCIONAL de features (malla, prioridad automática, admin, esquema DB) y se implementa dentro de las fases del v3.
 
 ---
 

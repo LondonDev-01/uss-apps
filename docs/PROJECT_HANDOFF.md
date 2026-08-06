@@ -1,6 +1,6 @@
 # UniHorario USS — Documentación de Proyecto
 
-> **⚠️ PLAN V2 EN DESARROLLO**: Ver `docs/PLAN_V2.md` para la especificación completa del v2 (backend, auth, prioridad automática, malla interactiva). Este documento describe el **v1 actual** (client-side, prioridades manuales).
+> **⚠️ PLAN V3 APROBADO EN DISEÑO**: Ver `docs/PLAN_V3.md` para la spec de plataforma del ecosistema (monorepo, hub, API única, contratos OpenAPI). Ver `docs/PLAN_V2.md` para la spec funcional (backend, auth, prioridad automática, malla interactiva). Este documento describe el **v1 actual** (client-side, prioridades manuales).
 
 ## Visión General
 
