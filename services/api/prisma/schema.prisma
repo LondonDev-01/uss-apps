@@ -1,0 +1,167 @@
+// Esquema del ecosistema uss-apps — spec: docs/PLAN_V2.md §3
+// Ownership de tablas por módulo: PLAN_V3 §4.1 (ADR-3)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  student
+  admin
+}
+
+// ---------------------------------------------------------------------------
+// Módulo: users
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String   @unique @db.VarChar(255)
+  name      String   @db.VarChar(255)
+  role      Role     @default(student)
+  mallaId   String?  @map("malla_id") @db.VarChar(10)
+  outlookId String?  @unique @map("outlook_id") @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  malla           Malla?               @relation(fields: [mallaId], references: [id])
+  cursosAprobados UserCursoAprobado[]
+  periodosSubidos Periodo[]
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Módulo: malla
+// ---------------------------------------------------------------------------
+
+model Malla {
+  id     String  @id @db.VarChar(10)
+  nombre String  @db.VarChar(255)
+  year   Int
+  activa Boolean @default(true)
+
+  cursos               MallaCurso[]
+  users                User[]
+  equivalenciasOrigen  CursoEquivalente[] @relation("mallaOrigen")
+  equivalenciasDestino CursoEquivalente[] @relation("mallaDestino")
+
+  @@map("mallas")
+}
+
+model MallaCurso {
+  id                  String  @id @db.VarChar(50)
+  mallaId             String  @map("malla_id") @db.VarChar(10)
+  nombre              String  @db.VarChar(255)
+  semestre            Int
+  esElectivo          Boolean @default(false) @map("es_electivo")
+  electivoCategoria   String? @map("electivo_categoria") @db.VarChar(50)
+  area                String? @db.VarChar(100)
+  ordenDentroSemestre Int     @default(0) @map("orden_dentro_semestre")
+
+  malla                Malla                 @relation(fields: [mallaId], references: [id])
+  prerrequisitos       MallaPrerrequisito[]  @relation("curso")
+  esPrerrequisitoDe    MallaPrerrequisito[]  @relation("prerequisito")
+  aprobados            UserCursoAprobado[]
+  equivalenciasOrigen  CursoEquivalente[]    @relation("cursoOrigen")
+  equivalenciasDestino CursoEquivalente[]    @relation("cursoDestino")
+
+  @@map("malla_cursos")
+}
+
+model MallaPrerrequisito {
+  cursoId        String @map("curso_id") @db.VarChar(50)
+  prerequisitoId String @map("prerequisito_id") @db.VarChar(50)
+
+  curso        MallaCurso @relation("curso", fields: [cursoId], references: [id])
+  prerequisito MallaCurso @relation("prerequisito", fields: [prerequisitoId], references: [id])
+
+  @@id([cursoId, prerequisitoId])
+  @@map("malla_prerrequisitos")
+}
+
+model UserCursoAprobado {
+  userId       String   @map("user_id") @db.Uuid
+  mallaCursoId String   @map("malla_curso_id") @db.VarChar(50)
+  aprobadoEn   DateTime @default(now()) @map("aprobado_en")
+
+  user       User       @relation(fields: [userId], references: [id])
+  mallaCurso MallaCurso @relation(fields: [mallaCursoId], references: [id])
+
+  @@id([userId, mallaCursoId])
+  @@map("user_cursos_aprobados")
+}
+
+model CursoEquivalente {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mallaOrigenId  String @map("malla_origen_id") @db.VarChar(10)
+  cursoOrigenId  String @map("curso_origen_id") @db.VarChar(50)
+  mallaDestinoId String @map("malla_destino_id") @db.VarChar(10)
+  cursoDestinoId String @map("curso_destino_id") @db.VarChar(50)
+
+  mallaOrigen  Malla      @relation("mallaOrigen", fields: [mallaOrigenId], references: [id])
+  cursoOrigen  MallaCurso @relation("cursoOrigen", fields: [cursoOrigenId], references: [id])
+  mallaDestino Malla      @relation("mallaDestino", fields: [mallaDestinoId], references: [id])
+  cursoDestino MallaCurso @relation("cursoDestino", fields: [cursoDestinoId], references: [id])
+
+  @@unique([cursoOrigenId, cursoDestinoId])
+  @@map("cursos_equivalentes")
+}
+
+// ---------------------------------------------------------------------------
+// Módulo: scheduler
+// ---------------------------------------------------------------------------
+
+model Periodo {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre    String   @db.VarChar(50)
+  subidoPor String?  @map("subido_por") @db.Uuid
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  subidoPorUser      User?               @relation(fields: [subidoPor], references: [id])
+  horarios           HorarioDisponible[]
+  electivoCategorias ElectivoCategoria[]
+
+  @@map("periodos")
+}
+
+model HorarioDisponible {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  periodoId         String   @map("periodo_id") @db.Uuid
+  nrc               String   @db.VarChar(20)
+  titulo            String   @db.VarChar(255)
+  tipo              String   @db.VarChar(10)
+  seccion           String?  @db.VarChar(20)
+  dia               String   @db.VarChar(20)
+  horaInicio        String   @map("hora_inicio") @db.VarChar(5)
+  horaFin           String   @map("hora_fin") @db.VarChar(5)
+  instructor        String?  @db.VarChar(255)
+  cupos             Int?
+  liga              String?  @db.VarChar(20)
+  conector          String?  @db.VarChar(20)
+  electivoCategoria String?  @map("electivo_categoria") @db.VarChar(50)
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  periodo Periodo @relation(fields: [periodoId], references: [id])
+
+  @@map("horarios_disponibles")
+}
+
+model ElectivoCategoria {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  periodoId        String   @map("periodo_id") @db.Uuid
+  mallaCategoriaId String   @map("malla_categoria_id") @db.VarChar(50)
+  nombreDisplay    String   @map("nombre_display") @db.VarChar(100)
+  nrcs             String[] @default([])
+
+  periodo Periodo @relation(fields: [periodoId], references: [id])
+
+  @@unique([periodoId, mallaCategoriaId])
+  @@map("electivo_categorias")
+}

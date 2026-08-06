@@ -290,7 +290,7 @@ Dependencias: **A → B → C → D → E → F**. Cada fase tiene su checklist 
 - [x] Vercel despliega `apps/horarios` correctamente (reconectado al repo `uss-apps` + Root Directory `apps/horarios` — verificado en producción 2026-08-06)
 - [ ] El repo viejo queda archivado (read-only) en GitHub (paso manual: Settings → Archive)
 
-### Fase B: API NestJS + Auth
+### Fase B: API NestJS + Auth ⏳ EN CURSO (iniciada 2026-08-06)
 
 **Objetivo**: `services/api` funcional con auth y CRUDs base. Equivale a Fase 1 de PLAN_V2.
 
