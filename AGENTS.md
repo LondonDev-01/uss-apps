@@ -52,7 +52,8 @@ Data flow: `Excel → excelParser.ts → HorarioCrudo[] → Categorize → Proce
 
 ## Docs source of truth
 
-- **`docs/PLAN_V2.md` is the NEW v2 specification** — backend, auth, auto-priority, malla interactiva.
+- **`docs/PLAN_V3.md` is the PLATFORM spec for the v3 ecosystem** — monorepo `uss-apps`, hub central, API NestJS única dueña de la DB, contratos OpenAPI, auth JWT, estándares de apps, fases A–F. Aún NO ejecutado (Fase A pendiente).
+- **`docs/PLAN_V2.md` is the FUNCTIONAL v2 specification** — backend, auth, auto-priority, malla interactiva, DB schema. Sigue vigente como spec de features dentro del v3.
 - **`docs/PROJECT_HANDOFF.md` is the authoritative doc for the CURRENT v1 code** (architecture, types, scoring formulas, bugs).
 - **`README.md` describes a LEGACY text-paste flow** (the `parser.ts` / `InputPage` flow). Current production uses Excel upload via `UploadPage` + `excelParser.ts`. `parser.ts` still exists but is legacy. Trust the handoff and the running code over the README.
 
