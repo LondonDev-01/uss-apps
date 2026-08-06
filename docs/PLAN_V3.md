@@ -1,6 +1,6 @@
 # UniHorario USS v3 — Plan Maestro: Ecosistema `uss-apps`
 
-> **Estado**: En ejecución — Fase A (migración al monorepo) completada a nivel técnico el 2026-08-06; pendientes solo los pasos manuales de Vercel y archivado del repo viejo. Próxima: Fase B.
+> **Estado**: En ejecución — Fase A (migración al monorepo) completada el 2026-08-06 (Vercel verificado en producción); pendiente solo archivar el repo viejo. Próxima: Fase B.
 > **Última actualización**: 2026-08-06
 > **Relación con otros docs**: `PLAN_V2.md` sigue siendo la **spec funcional** de features (malla interactiva, prioridad automática, admin panel, esquema de DB). Este documento es la **spec de plataforma**: cómo se organizan, comunican, autentican y despliegan las aplicaciones. `PROJECT_HANDOFF.md` describe el v1 actual.
 
@@ -287,7 +287,7 @@ Dependencias: **A → B → C → D → E → F**. Cada fase tiene su checklist 
 - [x] `pnpm install` desde la raíz instala todo el workspace
 - [x] `pnpm --filter horarios run build` pasa (equivale al `npm run build` actual)
 - [x] `npx tsc -b` en `apps/horarios` pasa
-- [ ] Vercel despliega `apps/horarios` correctamente (paso manual: reconectar al repo `uss-apps` + Root Directory `apps/horarios`)
+- [x] Vercel despliega `apps/horarios` correctamente (reconectado al repo `uss-apps` + Root Directory `apps/horarios` — verificado en producción 2026-08-06)
 - [ ] El repo viejo queda archivado (read-only) en GitHub (paso manual: Settings → Archive)
 
 ### Fase B: API NestJS + Auth
