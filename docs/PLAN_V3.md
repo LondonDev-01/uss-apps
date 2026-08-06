@@ -1,6 +1,6 @@
 # UniHorario USS v3 — Plan Maestro: Ecosistema `uss-apps`
 
-> **Estado**: Aprobado en diseño — pendiente de ejecución (Fase A)
+> **Estado**: En ejecución — Fase A (migración al monorepo) completada a nivel técnico el 2026-08-06; pendientes solo los pasos manuales de Vercel y archivado del repo viejo. Próxima: Fase B.
 > **Última actualización**: 2026-08-06
 > **Relación con otros docs**: `PLAN_V2.md` sigue siendo la **spec funcional** de features (malla interactiva, prioridad automática, admin panel, esquema de DB). Este documento es la **spec de plataforma**: cómo se organizan, comunican, autentican y despliegan las aplicaciones. `PROJECT_HANDOFF.md` describe el v1 actual.
 
@@ -266,7 +266,7 @@ volumes:
 
 Dependencias: **A → B → C → D → E → F**. Cada fase tiene su checklist de verificación — no se da por terminada sin pasarlo completo.
 
-### Fase A: Migración al monorepo ⏳ PRIMERA EN EJECUTAR
+### Fase A: Migración al monorepo ✅ EJECUTADA (2026-08-06)
 
 **Objetivo**: Mover el v1 al repo nuevo con historia intacta. CERO cambios funcionales.
 
@@ -282,13 +282,13 @@ Dependencias: **A → B → C → D → E → F**. Cada fase tiene su checklist 
 8. Push al repo nuevo; reconfigurar Vercel; archivar el repo viejo como read-only
 
 **Checklist de verificación Fase A**:
-- [ ] `git log --oneline` en el repo nuevo muestra la historia completa del v1
-- [ ] `git blame` funciona sobre archivos en `apps/horarios/`
-- [ ] `pnpm install` desde la raíz instala todo el workspace
-- [ ] `pnpm --filter horarios run build` pasa (equivale al `npm run build` actual)
-- [ ] `npx tsc -b` en `apps/horarios` pasa
-- [ ] Vercel despliega `apps/horarios` correctamente
-- [ ] El repo viejo queda archivado (read-only) en GitHub
+- [x] `git log --oneline` en el repo nuevo muestra la historia completa del v1 (131 commits migrados + reorganización)
+- [x] `git blame` funciona sobre archivos en `apps/horarios/`
+- [x] `pnpm install` desde la raíz instala todo el workspace
+- [x] `pnpm --filter horarios run build` pasa (equivale al `npm run build` actual)
+- [x] `npx tsc -b` en `apps/horarios` pasa
+- [ ] Vercel despliega `apps/horarios` correctamente (paso manual: reconectar al repo `uss-apps` + Root Directory `apps/horarios`)
+- [ ] El repo viejo queda archivado (read-only) en GitHub (paso manual: Settings → Archive)
 
 ### Fase B: API NestJS + Auth
 
