@@ -1,0 +1,19 @@
+# Compose de DEV: solo Postgres. El stack completo de producción
+# (api + caddy + frontends estáticos) llega en la Fase F — ver PLAN_V3 §6.2.
+services:
+  postgres:
+    image: postgres:16
+    container_name: uss-apps-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: uss_apps
+    ports:
+      # 5432 lo ocupa el Postgres 17 del sistema; 5434 lo usa islab-db
+      - "5435:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

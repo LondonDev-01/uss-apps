@@ -10,7 +10,7 @@ Monorepo (pnpm workspaces + turbo) of the USS apps ecosystem. The **platform spe
 
 - `apps/horarios/` — UniHorario (React 19 + TS 5.7 + Vite 6 + Tailwind 3 + framer-motion). 100% client-side SPA, no env vars. Migrated from `frontend/` of the v1 repo with full git history (`git blame`/`git log --follow` work).
 - `apps/` — every future app lives here (`hub`, `malla`, ...). Mandatory checklist: PLAN_V3 §3.1.
-- `services/` — backend services. Empty until Phase B (`api` NestJS + Prisma, sole DB owner).
+- `services/api/` — NestJS 11 + Prisma + PostgreSQL (Fase B en curso). Único dueño de la DB. Docs OpenAPI en `/api/docs`.
 - `packages/` — internal TS convenience libs only. NEVER the contract source of truth — OpenAPI is (ADR-2).
 - `docs/` — PLAN_V3.md, PLAN_V2.md, PROJECT_HANDOFF.md.
 - `assets/` — test excels, malla PDF, export scripts.
@@ -25,6 +25,12 @@ pnpm typecheck                        # turbo: typecheck everything
 pnpm --filter horarios run dev        # one app only (Vite on http://localhost:3000)
 pnpm --filter horarios run build      # tsc -b && vite build -> apps/horarios/dist/
 pnpm --filter horarios run typecheck  # tsc -b
+
+# API (services/api)
+docker compose up -d postgres         # DB dev en localhost:5435 (5432 lo ocupa el Postgres del sistema)
+pnpm --filter api run dev             # NestJS en :3001 — swagger UI en /api/docs
+pnpm --filter api run db:migrate      # prisma migrate dev (crea/aplica migraciones)
+pnpm --filter api run generate        # regenera Prisma Client (tras tocar schema.prisma)
 ```
 
 - **No test runner, no linter, no formatter is configured.** Verification = typecheck + build.
