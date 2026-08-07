@@ -6,12 +6,12 @@ services:
     container_name: uss-apps-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: uss_apps
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-uss_apps}
     ports:
-      # 5432 lo ocupa el Postgres 17 del sistema; 5434 lo usa islab-db
-      - "5435:5432"
+      # Bind a 127.0.0.1: la DB de dev NO debe publicarse en la red local (0.0.0.0)
+      - "127.0.0.1:5435:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
