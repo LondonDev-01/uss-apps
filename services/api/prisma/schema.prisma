@@ -27,11 +27,12 @@ model User {
   mallaId   String?  @map("malla_id") @db.VarChar(10)
   outlookId String?  @unique @map("outlook_id") @db.VarChar(255)
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   malla           Malla?               @relation(fields: [mallaId], references: [id])
   cursosAprobados UserCursoAprobado[]
   periodosSubidos Periodo[]
+  refreshTokens   RefreshToken[]
 
   @@map("users")
 }
@@ -111,6 +112,23 @@ model CursoEquivalente {
 
   @@unique([cursoOrigenId, cursoDestinoId])
   @@map("cursos_equivalentes")
+}
+
+// ---------------------------------------------------------------------------
+// Módulo: auth
+// ---------------------------------------------------------------------------
+
+model RefreshToken {
+  jti       String   @id @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }
 
 // ---------------------------------------------------------------------------
