@@ -12,7 +12,7 @@
 - [x] OAuth Microsoft + validación de dominio `*.uss.cl` + emisión de JWT
 - [x] `@nestjs/swagger` configurado desde el primer endpoint (ADR-2) — **hecho** (base)
 - [x] CRUDs: users, mallas, malla_cursos, user_cursos_aprobados — **hecho**
-- [~] `periodos` — parcial (list/findOne/create; sin update/delete ni CRUD de `horarios_disponibles`)
+- [x] `periodos` — CRUD completo (list/findOne/create/update/delete, `@Roles('admin')` en mutaciones); `horarios_disponibles` sigue diferido a Fase E
 - [ ] `horarios_disponibles`, `electivo_categorias` — **diferidos a Fase E** (COLLAB_PLAN no los necesita en C/D)
 - [x] Guards de autenticación y de roles
 - [~] Login end-to-end: Outlook → callback → JWT — **pendiente: credenciales reales + login en browser**
@@ -67,8 +67,8 @@ Todos con `@ApiTags` + `@nestjs/swagger`, `@ApiBearerAuth`, detrás de guard sal
 
 ## Pendiente para e2e real
 
-- Completar en `services/api/.env` (el dev no debe duplicar credenciales): `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET` reales (hoy placeholder `REEMPLAZA_ME`). El resto de la config (tenant, redirect, JWT secrets dev, success redirect) ya está.
-- Login en browser con cuenta `@uss.cl`: `/auth/microsoft/login` → redirige a Microsoft → callback → `/auth/me`.
+- `services/api/.env` ya tiene `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET` reales cargados (2026-08-08). Falta el login real en browser para cerrar la verificación.
+- Login en browser con cuenta `@uss.cl`: `/auth/microsoft/login` → redirige a Microsoft → callback → `/auth/me`. **Nota**: no se pudo ejecutar dentro de este entorno agente — el sandbox de la sesión bloquea a nivel de herramienta cualquier lectura/escritura de archivos `.env`, así que el proceso de la API no puede levantarse desde acá. Requiere correrlo manualmente (`pnpm --filter api run build && node services/api/dist/main.js`) y completar la sección 5 de `docs/TEST_PLAN_API_FASE_B.md`.
 
 ## Notas de riesgo
 
