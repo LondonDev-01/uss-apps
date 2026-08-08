@@ -45,31 +45,17 @@ Debería pasar en 1 minuto. Si falla acá, no seguir.
 
 Para el `auth` no se necesita OAuth para la mayoría de los tests: se firma un JWT HS256 con el **mismo `JWT_SECRET` de dev** que usa la API. Solo así se validan guards + roles + dominio sin depender del login de Microsoft.
 
-**Setup (una vez)**: exportar el secret y una función de firmado.
+**Setup (una vez)**: NO se necesita exportar nada. El repo incluye un helper que lee `JWT_SECRET` del `.env` y firma el token en un solo comando:
 
 ```bash
-export SEC=$(grep -E '^JWT_SECRET=' services/api/.env | cut -d= -f2-)
+# desde la raíz del repo
+STUDENT=$(node scripts/sign-jwt.mjs 3a3b0a6e-0000-4000-8000-000000000001 alumno1@uss.cl student Alumno 2024)
+ADMIN=$(node scripts/sign-jwt.mjs 3a3b0a6e-0000-4000-8000-000000000001 admin@uss.cl admin Admin -)
 ```
 
-**Helper** (`/tmp/opencode/sign.js`) — usar el que se creó en la sesión, o este equivalente:
-
-```bash
-sign() {
-  node - "$1" "$2" "$3" "$4" "$5" <<'EOF'
-const c=require("crypto");
-const b=j=>Buffer.from(JSON.stringify(j)).toString("base64url");
-const n=Math.floor(Date.now()/1000);
-const [s,e,r,na,m]=process.argv.slice(2);
-const h=b({alg:"HS256",typ:"JWT"});
-const p=b({sub:s,email:e,role:r,name:na,mallaId:m,iat:n,exp:n+3600});
-const sig=c.createHmac("sha256",process.env.SEC).update(h+"."+p).digest("base64url");
-process.stdout.write(h+"."+p+"."+sig);
-EOF
-STUDENT=$(sign "<uuid>" "alumno1@uss.cl" "student" "Alumno" "2024")
-ADMIN=$(sign "<uuid>" "admin@uss.cl" "admin" "Admin" "-")
-```
-
-> Nota: el `sub` debe ser un **UUID válido** (el `ParseUUIDPipe` en `GET /users/:id` lo valida), aunque el usuario no exista en la DB.
+> Args: `<sub> <email> <role> <name> [mallaId]`. El `sub` debe ser un **UUID válido** (`ParseUUIDPipe` en `GET /users/:id`), aunque el usuario no exista en la DB. Usar `-` como `mallaId` para `null`.
+>
+> 💡 Si al firmar sale token pero el endpoint da `401`, revisar que **no se corrió el export de un `JWT_SECRET` distinto**: el script usa el `.env` de `services/api`; cualquier variable `JWT_SECRET` ya exportada en tu shell lo pisa (ver sección 8).
 
 ### Matriz por Hallazgo
 
@@ -191,6 +177,8 @@ SELECT jti, "userId", "expiresAt", "revokedAt" FROM refresh_tokens ORDER BY "cre
 
 ## 8. Notas
 
-- La DB de `services/api/.env` trae secretos de dev que ya figuran en `.env.example` (de propósito, para que el flujo se pueda probar). 🚨 **No commitear `.env` real. Solo se commitea `.env.example`.**
+- La DB de `services/api/.env` trae secretos de dev que ya figuran en `.env.example` (de propósito, para que el flujo se pueda probar). 🚨 **No commitear `.env` real. Solo se commitea `.env.example`.** (`.env` ya está en `.gitignore` de la raíz).
+- `export` en bash/zsh **no imprime nada**: si un comando con `export SEC=$(...)` "no devuelve nada", es normal. Verificá con `echo "${#SEC}"`. Para no sufrir esto, el test usa `scripts/sign-jwt.mjs` que lee el secret él solo (no depende de variables de tu shell).
+- Si `scripts/sign-jwt.mjs` firma con el secret correcto pero el endpoint responde `401`, revisá que tu shell no tenga un `JWT_SECRET` viejo exportado (el script prioriza `process.env.JWT_SECRET` sobre el `.env`).
 - `horarios_disponibles` y `electivo_categorias` **no tienen endpoint aún** (diferido Fase E) — C4 espera 404 (ruta inexistente).
 - Compatibilidad de mensaje: `401` para usuario autenticado con dominio inválido (H4) y `401` para refresh revocado (H3) son la semántica elegida en el fix.

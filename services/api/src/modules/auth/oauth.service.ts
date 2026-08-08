@@ -10,6 +10,7 @@ export const OAUTH_STATE_COOKIE = 'uss_oauth_state';
 export interface OAuthVerifierState {
   state: string;
   codeVerifier: string;
+  nonce: string;
 }
 
 export interface AuthorizationUrlResult {
@@ -19,14 +20,14 @@ export interface AuthorizationUrlResult {
 
 @Injectable()
 export class OAuthService {
-  private readonly client: Client;
+  private readonly clientPromise: Promise<Client>;
 
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
   ) {
-    this.client = this.initClient();
+    this.clientPromise = this.initClient();
   }
 
   private issuerUrl(): string {
@@ -34,15 +35,11 @@ export class OAuthService {
     return `https://login.microsoftonline.com/${tenant}/v2.0`;
   }
 
-  // Cliente openid-client construido "a mano" con el discovery público del tenant
-  // USS (no requiere admin). El jwks_uri habilita la validación de firma RS256.
-  private initClient(): Client {
-    const issuer = new Issuer({
-      issuer: this.issuerUrl(),
-      authorization_endpoint: `${this.issuerUrl()}/authorize`,
-      token_endpoint: `${this.issuerUrl()}/token`,
-      jwks_uri: `${this.issuerUrl()}/discovery/v2.0/keys`,
-    });
+  // Cliente openid-client resuelto por discovery real del tenant (no endpoints
+  // a mano). Azure publica rutas /oauth2/v2.0/* que un `new Issuer` hardcodeado
+  // en /v2.0/* rompía con 404. El discovery elimina esa clase de bug de raíz.
+  private async initClient(): Promise<Client> {
+    const issuer = await Issuer.discover(this.issuerUrl());
     return new issuer.Client({
       client_id: this.config.get<string>('MICROSOFT_CLIENT_ID') ?? '',
       client_secret: this.config.get<string>('MICROSOFT_CLIENT_SECRET'),
@@ -52,30 +49,34 @@ export class OAuthService {
     });
   }
 
-  buildAuthorizationUrl(): AuthorizationUrlResult {
+  async buildAuthorizationUrl(): Promise<AuthorizationUrlResult> {
+    const client = await this.clientPromise;
     const codeVerifier = generators.codeVerifier();
     const codeChallenge = generators.codeChallenge(codeVerifier);
     const state = generators.state();
+    const nonce = generators.nonce();
 
-    const url = this.client.authorizationUrl({
+    const url = client.authorizationUrl({
       scope: 'openid profile email',
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
       state,
+      nonce,
       response_mode: 'query',
     });
 
-    return { url, verifier: { state, codeVerifier } };
+    return { url, verifier: { state, codeVerifier, nonce } };
   }
 
   async callback(
     params: Record<string, unknown>,
     verifier: OAuthVerifierState,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const tokenSet = await this.client.oauthCallback(
+    const client = await this.clientPromise;
+    const tokenSet = await client.callback(
       this.config.get<string>('MICROSOFT_REDIRECT_URI') ?? '',
       params,
-      { state: verifier.state, code_verifier: verifier.codeVerifier },
+      { state: verifier.state, code_verifier: verifier.codeVerifier, nonce: verifier.nonce },
     );
 
     const claims = tokenSet.claims();

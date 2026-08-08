@@ -64,7 +64,7 @@ export class AuthController {
   @Public()
   @ApiOperation({ summary: 'Inicia OAuth Microsoft: redirige a la URL de autorización' })
   async microsoftLogin(@Res() res: Response) {
-    const { url, verifier } = this.oauthService.buildAuthorizationUrl();
+    const { url, verifier } = await this.oauthService.buildAuthorizationUrl();
     res.cookie(OAUTH_STATE_COOKIE, verifier, {
       httpOnly: true,
       sameSite: 'lax',
@@ -78,35 +78,41 @@ export class AuthController {
   @Public()
   @ApiOperation({ summary: 'Callback Microsoft: emite JWT y redirige con token' })
   async microsoftCallback(@Req() req: Request, @Res() res: Response) {
-    const verifier = req.cookies?.[OAUTH_STATE_COOKIE] as
-      | { state: string; codeVerifier: string }
-      | undefined;
-    if (!verifier || verifier.state !== req.query.state) {
-      throw new BadRequestException('Verifier no coincide');
-    }
-
-    res.clearCookie(OAUTH_STATE_COOKIE, { path: '/' });
-
-    const { accessToken, refreshToken } = await this.oauthService.callback(
-      this.verifierCallbackParams(req),
-      verifier,
-    );
-
-    res.cookie(REFRESH_COOKIE, refreshToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: SECURE_COOKIE,
-      maxAge: REFRESH_COOKIE_MAX_AGE,
-      path: '/',
-    });
-
     const successRedirect = this.config.get<string>(
       'AUTH_SUCCESS_REDIRECT',
       'http://localhost:3000/',
     );
-    // Token en fragment (#) y no en query (?): el fragment no viaja al servidor
-    // de destino (PLAN_V3 §4.3).
-    res.redirect(`${successRedirect}#access_token=${encodeURIComponent(accessToken)}`);
+
+    const verifier = req.cookies?.[OAUTH_STATE_COOKIE] as
+      | { state: string; codeVerifier: string; nonce: string }
+      | undefined;
+    if (!verifier || verifier.state !== req.query.state) {
+      res.clearCookie(OAUTH_STATE_COOKIE, { path: '/' });
+      return res.redirect(`${successRedirect}?error=state_mismatch`);
+    }
+
+    res.clearCookie(OAUTH_STATE_COOKIE, { path: '/' });
+
+    try {
+      const { accessToken, refreshToken } = await this.oauthService.callback(
+        this.verifierCallbackParams(req),
+        verifier,
+      );
+
+      res.cookie(REFRESH_COOKIE, refreshToken, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: SECURE_COOKIE,
+        maxAge: REFRESH_COOKIE_MAX_AGE,
+        path: '/',
+      });
+
+      // Token en fragment (#) y no en query (?): el fragment no viaja al servidor
+      // de destino (PLAN_V3 §4.3).
+      res.redirect(`${successRedirect}#access_token=${encodeURIComponent(accessToken)}`);
+    } catch {
+      return res.redirect(`${successRedirect}?error=oauth_callback_failed`);
+    }
   }
 
   // Extrae los parámetros del callback OAuth de la request.
