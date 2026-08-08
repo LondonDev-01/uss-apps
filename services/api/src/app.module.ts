@@ -6,6 +6,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { MallaModule } from './modules/malla/malla.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
+import { OptimizerModule } from './modules/optimizer/optimizer.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
     UsersModule,
     MallaModule,
     SchedulerModule,
+    OptimizerModule,
   ],
   controllers: [HealthController],
 })

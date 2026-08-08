@@ -104,6 +104,43 @@ importers:
         specifier: ^6.0.0
         version: 6.4.3(@types/node@24.13.3)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.8)
 
+  apps/malla:
+    dependencies:
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
+      react-router-dom:
+        specifier: ^7.1.0
+        version: 7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.4(@types/react@19.2.18)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.0
+        version: 4.7.0(supports-color@8.1.1)(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.8))
+      autoprefixer:
+        specifier: ^10.5.4
+        version: 10.5.4(postcss@8.5.25)
+      postcss:
+        specifier: ^8.5.20
+        version: 8.5.25
+      tailwindcss:
+        specifier: ^3.4.19
+        version: 3.4.19(tsx@4.23.8)
+      typescript:
+        specifier: ~5.7.0
+        version: 5.7.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.3)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.8)
+
   services/api:
     dependencies:
       '@nestjs/common':

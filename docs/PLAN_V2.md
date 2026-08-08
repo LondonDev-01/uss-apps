@@ -687,12 +687,29 @@ const prioridad = prioridadesMap[horario.nrc]  // Calculado automáticamente
 **Dependencias**: PDFs de ambas mallas
 **Entregable**: Script SQL o JSON con la estructura de ambas mallas
 
-- [ ] Extraer estructura de Malla 2021 del PDF
-- [ ] Extraer estructura de Malla 2024 del PDF
-- [ ] Definir prerrequisitos para cada ramo
-- [ ] Definir áreas y categorías de electivos
-- [ ] Crear script de seed para PostgreSQL
-- [ ] Verificar que el grafo de prerrequisitos es válido (sin ciclos)
+- [x] Extraer estructura de Malla 2021 del PDF — `assets/Malla_Vieja.pdf` →
+      `services/api/prisma/seed-data/malla-2021.ts` (62 ramos, semestre + área)
+- [x] Extraer estructura de Malla 2024 del PDF — `assets/Malla_Nueva.pdf` →
+      `services/api/prisma/seed-data/malla-2024.ts` (52 ramos, semestre + área)
+- [~] Definir prerrequisitos para cada ramo — **borrador heurístico, NO
+      validado con el profe Hugo**. Ninguno de los dos PDFs incluye las
+      líneas de conexión de prerrequisitos reales (solo semestre/área por
+      color); se infirieron 26 relaciones conservadoras (continuaciones
+      numeradas obvias del mismo ramo, ej. "Inglés I → II"). El resto de
+      los 114 ramos queda sin prerrequisito hasta la validación real.
+- [x] Definir áreas y categorías de electivos — áreas transcritas del
+      legend de cada PDF (son distintas entre 2021 y 2024, no se
+      unificaron); `esElectivo`/`electivoCategoria` marcados por nombre
+- [x] Crear script de seed para PostgreSQL — `services/api/prisma/seed.ts`,
+      idempotente, corrido contra la DB de dev el 2026-08-08 sin errores
+- [x] Verificar que el grafo de prerrequisitos es válido (sin ciclos) —
+      DFS en `seed.ts#assertSinCiclos`, corre en cada `prisma db seed`
+
+> ⚠️ Esta fase NO está cerrada en el sentido estricto del plan: falta la
+> validación de la estructura completa (ramos + prerrequisitos) con el
+> profe Hugo antes de tratarla como fuente de verdad para inscripciones
+> reales. Lo que hay hoy es suficiente para construir y probar Fase 2/3
+> con datos reales de verdad (no placeholders), no para producción.
 
 ### Fase 1: Backend + Auth — ~5-7 días
 

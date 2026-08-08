@@ -17,4 +17,11 @@ export const APPS: AppRegistryEntry[] = [
     icon: '🗓️',
     url: 'http://localhost:3000',
   },
+  {
+    id: 'malla',
+    name: 'Malla Curricular',
+    description: 'Malla interactiva con prioridad de ramos por período.',
+    icon: '🎓',
+    url: 'http://localhost:3003',
+  },
 ]

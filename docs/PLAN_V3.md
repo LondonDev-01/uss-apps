@@ -322,14 +322,34 @@ Dependencias: **A → B → C → D → E → F**. Cada fase tiene su checklist 
 - [ ] Flujo completo: app sin sesión → hub → login → app con JWT funcional — **pendiente de verificación manual**: requiere cambiar `AUTH_SUCCESS_REDIRECT=http://localhost:3002/` en `services/api/.env` (no editable por el agente) y correr `pnpm --filter api run dev` + `pnpm --filter hub run dev` + `pnpm --filter horarios run dev` en paralelo. Ver `apps/hub/README.md` para los pasos exactos.
 - [ ] El menú lista `horarios` y enlaza correctamente — implementado (`registry.ts`), pendiente de confirmar visualmente en el mismo pase de verificación manual
 
-### Fase D: Malla interactiva + prioridad automática
+### Fase D: Malla interactiva + prioridad automática ⏳ EN CURSO (iniciada 2026-08-08)
 
 **Objetivo**: `apps/malla` + lógica de prioridades del backend. Equivale a Fases 0, 2 y 3 de PLAN_V2 — la spec funcional (estados visuales, algoritmo `calcularPrioridades`, matching Excel↔Malla, equivalencias) está ahí y NO se duplica acá.
 
 **Checklist Fase D**:
-- [ ] Seed de mallas 2021 y 2024 validado con el profe Hugo
-- [ ] Malla interactiva con los 5 estados visuales de PLAN_V2 §6
-- [ ] `GET /api/v1/optimizer/prioridades` responde según PLAN_V2 §10
+- [~] Seed de mallas 2021 y 2024 — datos **reales** cargados desde los PDFs
+      oficiales (`assets/Malla_Vieja.pdf` y `Malla_Nueva.pdf`, 114 ramos en
+      total), pero **prerrequisitos sin validar con el profe Hugo** — ver
+      detalle en `PLAN_V2.md` Fase 0. No cerrar este ítem hasta esa validación.
+- [~] Malla interactiva con los 5 estados visuales de PLAN_V2 §6 —
+      `apps/malla` (puerto 3003), auth gateada de verdad (redirige al hub
+      si no hay sesión), selección de malla, grilla de 10 semestres,
+      progreso, buscador. Código listo y revisado, `typecheck`/`build`
+      limpios; falta la verificación manual en browser (igual que Fase C).
+- [x] `GET /api/v1/optimizer/prioridades` responde según PLAN_V2 §10 —
+      implementado en `services/api/src/modules/optimizer/`, verificado
+      contra el ejemplo práctico del plan
+      (`services/api/scripts/verify-optimizer.ts`) y end-to-end contra la
+      DB real. Campo `cursosDisponibles` es aditivo (no rompe el contrato
+      v1). `PATCH /users/me` agregado para la selección de malla (§4.2).
+
+> Dos bugs preexistentes encontrados y corregidos al construir esto:
+> (1) `POST /aprobados/me` exigía `@IsUUID()` en `mallaCursoId`, pero
+> `MallaCurso.id` es un string libre — rechazaba cualquier id real de
+> curso. (2) El matching fuzzy Excel↔Malla de PLAN_V2 §8, seguido
+> literal, da falsos positivos en nombres cortos ("Ética" matcheaba
+> contra "Mecánica") — se cambió a una razón relativa sin piso fijo, ver
+> `matching.ts`.
 
 ### Fase E: Admin panel + integración optimizer
 

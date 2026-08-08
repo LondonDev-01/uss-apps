@@ -47,4 +47,25 @@ export class AprobadosService {
       throw error;
     }
   }
+
+  // Solo actualiza la nota — no toca `aprobadoEn` (a diferencia de
+  // `upsert`, que sí lo resetea; acá el ramo ya está aprobado, no se está
+  // volviendo a marcar). 404 si el ramo no está aprobado todavía: no tiene
+  // sentido calificar algo que no se cursó.
+  async setNota(user: AuthenticatedUser, mallaCursoId: string, nota: number) {
+    try {
+      return await this.prisma.userCursoAprobado.update({
+        where: { userId_mallaCursoId: { userId: user.id, mallaCursoId } },
+        data: { nota },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException('Curso aprobado de malla inexistente');
+      }
+      throw error;
+    }
+  }
 }
