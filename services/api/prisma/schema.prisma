@@ -90,6 +90,9 @@ model UserCursoAprobado {
   userId       String   @map("user_id") @db.Uuid
   mallaCursoId String   @map("malla_curso_id") @db.VarChar(50)
   aprobadoEn   DateTime @default(now()) @map("aprobado_en")
+  // Escala chilena 1.0-7.0. Opcional: se puede marcar un ramo como aprobado
+  // sin nota, y agregarla después (apps/malla la pide en un segundo click).
+  nota         Decimal? @db.Decimal(2, 1)
 
   user       User       @relation(fields: [userId], references: [id])
   mallaCurso MallaCurso @relation(fields: [mallaCursoId], references: [id])

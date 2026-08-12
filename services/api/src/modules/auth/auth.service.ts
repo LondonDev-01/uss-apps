@@ -106,6 +106,31 @@ export class AuthService {
   me(authUser: AuthenticatedUser): AuthenticatedUser {
     return authUser;
   }
+
+  // Revoca el refresh token de la cookie, si es válido. Deliberadamente
+  // silencioso ante cualquier falla (token ausente, inválido, expirado o ya
+  // revocado): logout siempre debe "tener éxito" desde la perspectiva del
+  // cliente — no hay nada más que hacer del lado del servidor en esos casos.
+  async logout(refreshToken: string | undefined): Promise<void> {
+    if (!refreshToken) return;
+
+    const refreshSecret = this.config.get<string>('JWT_REFRESH_SECRET');
+    let payload: JwtPayload & { jti?: string };
+    try {
+      payload = await this.jwt.verifyAsync<JwtPayload & { jti?: string }>(
+        refreshToken,
+        { secret: refreshSecret },
+      );
+    } catch {
+      return;
+    }
+    if (!payload.jti) return;
+
+    await this.prisma.refreshToken.updateMany({
+      where: { jti: payload.jti, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
 }
 
 export { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL_MS };

@@ -42,6 +42,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Public()
   @ApiOperation({ summary: 'Rota el access + refresh token usando la cookie httpOnly' })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies?.[REFRESH_COOKIE] as string | undefined;
@@ -58,6 +59,16 @@ export class AuthController {
       path: '/',
     });
     return { accessToken };
+  }
+
+  @Post('logout')
+  @Public()
+  @ApiOperation({ summary: 'Revoca el refresh token y limpia la cookie de sesión' })
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = req.cookies?.[REFRESH_COOKIE] as string | undefined;
+    await this.authService.logout(refreshToken);
+    res.clearCookie(REFRESH_COOKIE, { path: '/' });
+    return { ok: true };
   }
 
   @Get('microsoft/login')

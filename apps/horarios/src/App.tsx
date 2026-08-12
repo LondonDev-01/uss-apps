@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { HashRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import { StoreProvider } from './store'
+import AuthStatus from './components/AuthStatus'
 import UploadPage from './pages/UploadPage'
 import CategorizePage from './pages/CategorizePage'
 import ProcessPage from './pages/ProcessPage'
@@ -115,7 +116,10 @@ function Layout() {
               Optimizador inteligente de horarios · Universidad San Sebastián
             </p>
           </motion.div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <AuthStatus />
+            <ThemeToggle />
+          </div>
         </motion.header>
 
         <motion.div

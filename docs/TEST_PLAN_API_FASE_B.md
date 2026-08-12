@@ -95,13 +95,19 @@ ADMIN=$(node scripts/sign-jwt.mjs 3a3b0a6e-0000-4000-8000-000000000001 admin@uss
 | P5 | **H5** — upsert sobre curso inexist | `POST .../aprobados/me/curso-no-existe` | **404** (antes 401) |
 | P6 | idempotencia | marcar 2 veces el mismo curso | no duplica (upsert) |
 
-### 4.3 Periodos (scheduler — parcial, Fase E)
+### 4.3 Periodos (scheduler — CRUD completo desde 2026-08-08; `horarios_disponibles`/`electivo_categorias` siguen en Fase E)
 
 | ID | Test | Comando | Esperando |
 |----|------|---------|----------|
 | C1 | listar | `curl -H "Authorization: Bearer $STUDENT" .../periodos` | 200 |
-| C2 | crear | `POST .../periodos` body `{"nombre":"2026-2"}` | 201 y `id` |
+| C2 | crear (solo admin) | `POST .../periodos` body `{"nombre":"2026-2"}` con `$ADMIN` | 201 y `id` |
+| C2b | crear con student | `POST .../periodos` con `$STUDENT` | 403 (`@Roles('admin')`) |
 | C3 | detalle | `GET .../periodos/<id>` | 200 con el creado |
+| C5 | actualizar (solo admin) | `PATCH .../periodos/<id>` body `{"activo":false}` con `$ADMIN` | 200, `activo:false` |
+| C5b | actualizar con student | `PATCH .../periodos/<id>` con `$STUDENT` | 403 |
+| C5c | actualizar inexistente | `PATCH .../periodos/<uuid-random>` con `$ADMIN` | 404 |
+| C6 | eliminar (solo admin) | `DELETE .../periodos/<id>` con `$ADMIN` | 200/204 |
+| C6b | eliminar inexistente | `DELETE .../periodos/<uuid-random>` con `$ADMIN` | 404 |
 | C4 | `horarios_disponibles`/`electivo_categorias` | probar un GET | **404** ruta (diferido a Fase E — no es un bug) 📝 |
 
 ---
@@ -159,7 +165,9 @@ SELECT jti, "userId", "expiresAt", "revokedAt" FROM refresh_tokens ORDER BY "cre
 
 | ID | Hallazgo/feature | Resultado (PASS / FAIL) | Notas |
 |----|------------------|------------------------|-------|
-| S1–S4 | Sanidad | — | |
+| R1–R7 | Prerrequisitos (DB, migraciones, seed) | **PASS** | Verificado 2026-08-08: `docker ps` (postgres up), `prisma migrate deploy` (aplicó `add_refresh_tokens_and_updated_at_default`), `prisma generate`, `db:seed` (mallas 2021/2024 + admin) |
+| H10 | build exitoso | **PASS** | `pnpm run typecheck` + `pnpm run build` sin errores (2026-08-08) |
+| S1–S4 | Sanidad | — | pendiente: requiere API levantada con proceso propio, ver nota abajo |
 | A1a | H1 student block 403 | — | |
 | A1b | H1 admin 200/404 | — | |
 | A1c | H1 sin token 401 | — | |
@@ -167,11 +175,13 @@ SELECT jti, "userId", "expiresAt", "revokedAt" FROM refresh_tokens ORDER BY "cre
 | A4a/b/c | H4 dominio | — | |
 | M1–M5 | mallas | — | |
 | P1–P6 | aprobados (H5) | — | |
-| C1–C4 | periodos | — | |
-| O1–O8 | OAuth e2e (H3/H7) | — | requiere credentials real |
-| H8–H10 | config/seed | — | |
+| C1–C6b | periodos (incl. update/delete nuevos) | — | |
+| O1–O8 | OAuth e2e (H3/H7) | **PASS** | Verificado manualmente por el usuario en browser el 2026-08-08: login con cuenta `@uss.cl` real y rechazo de dominios fuera de `*.uss.cl` |
+| H8–H9 | config/seed (default DB, idempotencia seed) | — | |
 
 **Cierre**: al completar, registrar el resultado en este archivo y/o en el commit de docs.
+
+> ⚠️ **Nota 2026-08-08**: los tests de Nivel 0–4 (S1–C6b, H8–H9) y el flujo OAuth de Nivel 3 (O1–O8) **no se pudieron ejecutar desde el entorno del agente**: el sandbox de la sesión bloquea a nivel de herramienta cualquier lectura/escritura de `.env`, y sin eso el proceso `node dist/main.js` no puede levantar (`JwtStrategy requires a secret or key`). Solo se pudo verificar de forma automatizada lo que no depende de leer `.env` directamente por el agente: prerrequisitos de infra (Docker, migraciones, seed — ejecutados vía `pnpm exec prisma ...`, que sí carga su propio `.env` internamente) y `typecheck`/`build`. El resto de la matriz queda pendiente de ejecución manual por quien tenga el `.env` real y las credenciales `@uss.cl` — seguir la sección 3 (JWT firmado a mano) y sección 5 (browser) de este documento.
 
 ---
 

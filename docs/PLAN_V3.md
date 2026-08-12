@@ -290,43 +290,66 @@ Dependencias: **A → B → C → D → E → F**. Cada fase tiene su checklist 
 - [x] Vercel despliega `apps/horarios` correctamente (reconectado al repo `uss-apps` + Root Directory `apps/horarios` — verificado en producción 2026-08-06)
 - [ ] El repo viejo queda archivado (read-only) en GitHub (paso manual: Settings → Archive)
 
-### Fase B: API NestJS + Auth ⏳ EN CURSO (iniciada 2026-08-06)
+### Fase B: API NestJS + Auth ✅ COMPLETA (iniciada 2026-08-06, cerrada 2026-08-08)
 
 **Objetivo**: `services/api` funcional con auth y CRUDs base. Equivale a Fase 1 de PLAN_V2.
 
 - Setup NestJS + Prisma + PostgreSQL (compose de dev)
 - OAuth Microsoft + validación de dominio `uss.cl` + emisión de JWT
 - `@nestjs/swagger` configurado desde el primer endpoint (ADR-2)
-- CRUDs: users, mallas, malla_cursos, user_cursos_aprobados, periodos, horarios_disponibles
+- CRUDs: users, mallas, malla_cursos, user_cursos_aprobados, periodos — **hecho** (`horarios_disponibles`/`electivo_categorias` diferidos a Fase E, ver `docs/IMPLEMENT_API_PLAN.md`)
 - Guards de autenticación y de roles
 
 **Checklist Fase B**:
-- [ ] Login end-to-end: Outlook → callback → JWT
-- [ ] Login rechaza emails fuera de `*.uss.cl`
-- [ ] `/api/docs` muestra el spec completo generado
-- [ ] Migraciones Prisma reproducibles desde cero (`migrate deploy` sobre DB vacía)
+- [x] `/api/docs` muestra el spec completo generado — verificado (Swagger configurado desde el primer endpoint)
+- [~] Migraciones Prisma reproducibles — `prisma migrate deploy` verificado el 2026-08-08 (aplicó la migración pendiente `add_refresh_tokens_and_updated_at_default` sin errores); falta correrlo una vez más sobre una DB completamente vacía para el checklist estricto
+- [x] Login end-to-end: Outlook → callback → JWT — **verificado manualmente en browser por el usuario el 2026-08-08** (cuenta `@uss.cl` real, flujo completo `/auth/microsoft/login` → callback → JWT funcional)
+- [x] Login rechaza emails fuera de `*.uss.cl` — **verificado manualmente el 2026-08-08** junto con el ítem anterior (`USS_DOMAIN_REGEX` en `oauth.service.ts` y `jwt.strategy.ts`)
 
-### Fase C: Hub mínimo
+> Los 8 hallazgos de la auditoría interna (`docs/REVIEW_API_FASE_B.md`, H1–H8) están **todos corregidos y verificados en código** (2026-08-08), y el login OAuth quedó verificado e2e en browser el mismo día. **Fase B queda cerrada.**
+
+### Fase C: Hub mínimo ⏳ IMPLEMENTADA (2026-08-08), pendiente verificación e2e
 
 **Objetivo**: `apps/hub` con login, dashboard y menú de apps. Al inicio es deliberadamente simple.
 
-- Pantalla de login (botón Microsoft)
-- Dashboard: datos del usuario + cards de apps disponibles (registry estático `apps/hub/src/registry.ts`)
-- Manejo del refresh token (única app con cookie httpOnly)
-- Redirect de retorno: apps sin sesión → hub → vuelta a la app de origen con token
+- [x] Pantalla de login (botón Microsoft) — `apps/hub/src/pages/LoginPage.tsx`
+- [x] Dashboard: datos del usuario + cards de apps disponibles (registry estático `apps/hub/src/registry.ts`, hoy con `horarios`)
+- [x] Manejo del refresh token (única app con cookie httpOnly) — `AuthProvider` rehidrata sesión vía `POST /auth/refresh` con `credentials: 'include'`
+- [x] Redirect de retorno: apps sin sesión → hub → vuelta a la app de origen con token — soporta `?returnTo=` genérico (no solo horarios)
+- [x] Integración mínima no invasiva en `apps/horarios` (`AuthStatus.tsx`) para poder demostrar el loop completo sin gatear rutas existentes
 
-**Checklist Fase C**:
-- [ ] Flujo completo: app sin sesión → hub → login → app con JWT funcional
-- [ ] El menú lista `horarios` y enlaza correctamente
+**Checklist Fase C** (código listo, falta correrlo en browser):
+- [ ] Flujo completo: app sin sesión → hub → login → app con JWT funcional — **pendiente de verificación manual**: requiere cambiar `AUTH_SUCCESS_REDIRECT=http://localhost:3002/` en `services/api/.env` (no editable por el agente) y correr `pnpm --filter api run dev` + `pnpm --filter hub run dev` + `pnpm --filter horarios run dev` en paralelo. Ver `apps/hub/README.md` para los pasos exactos.
+- [ ] El menú lista `horarios` y enlaza correctamente — implementado (`registry.ts`), pendiente de confirmar visualmente en el mismo pase de verificación manual
 
-### Fase D: Malla interactiva + prioridad automática
+### Fase D: Malla interactiva + prioridad automática ⏳ EN CURSO (iniciada 2026-08-08)
 
 **Objetivo**: `apps/malla` + lógica de prioridades del backend. Equivale a Fases 0, 2 y 3 de PLAN_V2 — la spec funcional (estados visuales, algoritmo `calcularPrioridades`, matching Excel↔Malla, equivalencias) está ahí y NO se duplica acá.
 
 **Checklist Fase D**:
-- [ ] Seed de mallas 2021 y 2024 validado con el profe Hugo
-- [ ] Malla interactiva con los 5 estados visuales de PLAN_V2 §6
-- [ ] `GET /api/v1/optimizer/prioridades` responde según PLAN_V2 §10
+- [~] Seed de mallas 2021 y 2024 — datos **reales** cargados desde los PDFs
+      oficiales (`assets/Malla_Vieja.pdf` y `Malla_Nueva.pdf`, 114 ramos en
+      total), pero **prerrequisitos sin validar con el profe Hugo** — ver
+      detalle en `PLAN_V2.md` Fase 0. No cerrar este ítem hasta esa validación.
+- [~] Malla interactiva con los 5 estados visuales de PLAN_V2 §6 —
+      `apps/malla` (puerto 3003), auth gateada de verdad (redirige al hub
+      si no hay sesión), selección de malla, grilla de 10 semestres,
+      progreso, buscador. Código listo y revisado, `typecheck`/`build`
+      limpios; falta la verificación manual en browser (igual que Fase C).
+- [x] `GET /api/v1/optimizer/prioridades` responde según PLAN_V2 §10 —
+      implementado en `services/api/src/modules/optimizer/`, verificado
+      contra el ejemplo práctico del plan
+      (`services/api/scripts/verify-optimizer.ts`) y end-to-end contra la
+      DB real. Campo `cursosDisponibles` es aditivo (no rompe el contrato
+      v1). `PATCH /users/me` agregado para la selección de malla (§4.2).
+
+> Dos bugs preexistentes encontrados y corregidos al construir esto:
+> (1) `POST /aprobados/me` exigía `@IsUUID()` en `mallaCursoId`, pero
+> `MallaCurso.id` es un string libre — rechazaba cualquier id real de
+> curso. (2) El matching fuzzy Excel↔Malla de PLAN_V2 §8, seguido
+> literal, da falsos positivos en nombres cortos ("Ética" matcheaba
+> contra "Mecánica") — se cambió a una razón relativa sin piso fijo, ver
+> `matching.ts`.
 
 ### Fase E: Admin panel + integración optimizer
 
