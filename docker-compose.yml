@@ -1,5 +1,7 @@
-# Compose de DEV: solo Postgres. El stack completo de producción
-# (api + caddy + frontends estáticos) llega en la Fase F — ver PLAN_V3 §6.2.
+# Compose — desarrollo y producción
+# Desarrollo: docker compose up -d (solo Postgres)
+# Producción: docker compose --profile prod up -d (todo el stack)
+
 services:
   postgres:
     image: postgres:16
@@ -10,10 +12,50 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-uss_apps}
     ports:
-      # Bind a 127.0.0.1: la DB de dev NO debe publicarse en la red local (0.0.0.0)
       - "127.0.0.1:5435:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-uss_apps}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    container_name: uss-apps-api
+    restart: unless-stopped
+    profiles: ["prod"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-uss_apps}?schema=public
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: uss-apps-caddy
+    restart: unless-stopped
+    profiles: ["prod"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./apps/hub/dist:/app/hub/dist:ro
+      - ./apps/horarios/dist:/app/horarios/dist:ro
+      - ./apps/malla/dist:/app/malla/dist:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

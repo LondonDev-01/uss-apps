@@ -1,0 +1,27 @@
+# Caddyfile — uss-apps local development
+# Cuando tengas dominio, reemplaza ":80" con "tudominio.cl" y agrega tls.
+
+:80 {
+	# API — proxy reverso a NestJS
+	handle /api/* {
+		reverse_proxy api:3001
+	}
+
+	# UniHorario — SPA estática
+	handle /horarios/* {
+		root * /app/horarios/dist
+		file_server
+	}
+
+	# Malla Curricular — SPA estática
+	handle /malla/* {
+		root * /app/malla/dist
+		file_server
+	}
+
+	# Hub (portal) — SPA estática (ruta raíz)
+	handle {
+		root * /app/hub/dist
+		file_server
+	}
+}
