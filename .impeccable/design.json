@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-14T00:00:00Z",
+  "title": "Design System: USS Apps Ecosystem",
+  "extensions": {
+    "colorMeta": {
+      "deep-midnight": {
+        "role": "neutral",
+        "displayName": "Deep Midnight",
+        "canonical": "#0a0d14",
+        "tonalRamp": ["#050709", "#0a0d14", "#0f1520", "#141d2c", "#1a2538", "#1f2d44", "#253550", "#2b3d5c"]
+      },
+      "elevated-slate": {
+        "role": "neutral",
+        "displayName": "Elevated Slate",
+        "canonical": "#11151f",
+        "tonalRamp": ["#0a0d14", "#11151f", "#181d2a", "#1f2535", "#262d40", "#2d354b", "#343d56", "#3b4561"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#161b27",
+        "tonalRamp": ["#0e1219", "#161b27", "#1e2435", "#262d43", "#2e3651", "#363f5f", "#3e486d", "#46517b"]
+      },
+      "surface-hover": {
+        "role": "neutral",
+        "displayName": "Surface Hover",
+        "canonical": "#1c2230",
+        "tonalRamp": ["#12171f", "#1c2230", "#262d41", "#303852", "#3a4363", "#444e74", "#4e5985", "#586496"]
+      },
+      "light-text": {
+        "role": "neutral",
+        "displayName": "Light Text",
+        "canonical": "#e4e7eb",
+        "tonalRamp": ["#2d3548", "#5e6675", "#7a8290", "#9ba3b0", "#bcc3cc", "#d4d8de", "#e4e7eb", "#f2f4f6"]
+      },
+      "muted-text": {
+        "role": "neutral",
+        "displayName": "Muted Text",
+        "canonical": "#9ba3b0",
+        "tonalRamp": ["#3b4454", "#5e6675", "#737b8a", "#9ba3b0", "#aeb5be", "#c1c7ce", "#d4d9de", "#e7eaed"]
+      },
+      "subtle-text": {
+        "role": "neutral",
+        "displayName": "Subtle Text",
+        "canonical": "#5e6675",
+        "tonalRamp": ["#2d3548", "#3b4454", "#4a5364", "#5e6675", "#737b8a", "#8a919e", "#a1a7b2", "#b8bcc5"]
+      },
+      "steel-blue": {
+        "role": "primary",
+        "displayName": "Steel Blue",
+        "canonical": "#6b7a99",
+        "tonalRamp": ["#2a3142", "#3d4a63", "#506384", "#6b7a99", "#8895b3", "#a3aeca", "#bdc6de", "#d6dae9"]
+      },
+      "warm-gold": {
+        "role": "accent",
+        "displayName": "Warm Gold",
+        "canonical": "#c4a87a",
+        "tonalRamp": ["#3d3625", "#6b5c40", "#99825b", "#c4a87a", "#d4bc92", "#e0ceab", "#ecdcc4", "#f5ebde"]
+      },
+      "sage-green": {
+        "role": "success",
+        "displayName": "Sage Green",
+        "canonical": "#7a9971",
+        "tonalRamp": ["#2a3826", "#3d5038", "#50684a", "#7a9971", "#93ad8b", "#acc1a5", "#c5d5bf", "#dee9d9"]
+      },
+      "warm-amber": {
+        "role": "warning",
+        "displayName": "Warm Amber",
+        "canonical": "#b8956b",
+        "tonalRamp": ["#3d3122", "#6b5438", "#99774e", "#b8956b", "#c8ab85", "#d8c19f", "#e8d7b9", "#f8edda"]
+      },
+      "muted-rose": {
+        "role": "danger",
+        "displayName": "Muted Rose",
+        "canonical": "#b87878",
+        "tonalRamp": ["#3a2828", "#6b4545", "#996262", "#b87878", "#c89595", "#d8b2b2", "#e8cfcf", "#f8ecec"]
+      },
+      "dusty-rose": {
+        "role": "category",
+        "displayName": "Dusty Rose",
+        "canonical": "#b87a96",
+        "tonalRamp": ["#3a2530", "#6b4055", "#995b7a", "#b87a96", "#c895ad", "#d8b0c4", "#e8cbdb", "#f8e6f2"]
+      },
+      "muted-teal": {
+        "role": "category",
+        "displayName": "Muted Teal",
+        "canonical": "#7a9999",
+        "tonalRamp": ["#253838", "#3d5858", "#587878", "#7a9999", "#95b0b0", "#b0c7c7", "#cbdede", "#e6f5f5"]
+      }
+    },
+    "typographyMeta": {
+      "body": {
+        "displayName": "Body",
+        "purpose": "Primary reading text, paragraphs, descriptions."
+      },
+      "heading": {
+        "displayName": "Heading",
+        "purpose": "Section titles, page headings. Bold but not heavy."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Category labels, table headers, chip text. Uppercase in schedule grid headers."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Time cells, NRC codes, technical identifiers."
+      }
+    },
+    "shadows": [
+      { "name": "subtle", "value": "0 1px 2px 0 rgb(0 0 0 / 0.3)", "purpose": "Minimal lift for chips, small elements." },
+      { "name": "default", "value": "0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.3)", "purpose": "Cards, containers. Present but not attention-grabbing." },
+      { "name": "medium", "value": "0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.3)", "purpose": "Dropdowns, popovers, elevated panels." },
+      { "name": "large", "value": "0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.3)", "purpose": "Modals, dialogs." },
+      { "name": "glow", "value": "0 0 30px rgba(107, 122, 153, 0.08)", "purpose": "Atmospheric background effect only — never on interactive elements." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default easing for state transitions." },
+      { "name": "ease-spring", "value": "cubic-bezier(0.34, 1.56, 0.64, 1)", "purpose": "Bouncy entrance animations (modals, toasts)." },
+      { "name": "duration-fast", "value": "120ms", "purpose": "Micro-interactions: hover states, focus rings." },
+      { "name": "duration-default", "value": "200ms", "purpose": "Standard transition duration." },
+      { "name": "duration-slow", "value": "300ms", "purpose": "Page transitions, drag interactions." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ],
+    "glass": {
+      "dark": { "bg": "rgba(22, 27, 39, 0.6)", "border": "rgba(155, 163, 176, 0.08)", "backdropFilter": "blur(12px)" },
+      "light": { "bg": "rgba(255, 255, 255, 0.75)", "border": "rgba(155, 163, 176, 0.12)", "backdropFilter": "blur(12px)" }
+    },
+    "schedulePalette": {
+      "description": "Pastel colors for course blocks in the schedule grid. One color per distinct course, cycling through the palette.",
+      "colors": ["#BFDBFE", "#BBF7D0", "#FEF3C7", "#FECACA", "#DDD6FE", "#F5D0FE", "#FED7AA", "#E9D5FF", "#A5F3FC", "#FDE68A", "#FBCFE8", "#C7D2FE", "#D9F99D", "#FCA5A5", "#A7F3D0"]
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Inverted button — light bg on dark canvas. Used for primary CTAs.",
+      "html": "<button class=\"ds-btn-primary\">Guardar cambios</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 12px 20px; border-radius: 14px; background: #e4e7eb; color: #0a0d14; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.95rem; border: 1px solid #e4e7eb; cursor: pointer; transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { background: #8895b3; border-color: #8895b3; } .ds-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Surface-toned button for less critical actions.",
+      "html": "<button class=\"ds-btn-secondary\">Cancelar</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 8px 14px; border-radius: 14px; background: #161b27; color: #e4e7eb; font-weight: 500; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.9rem; border: 1px solid #232a39; cursor: pointer; transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-secondary:hover { background: #1c2230; border-color: #2d3548; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Transparent button for tertiary actions. Appears on hover only.",
+      "html": "<button class=\"ds-btn-ghost\">Ver detalles</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 8px 14px; border-radius: 14px; background: transparent; color: #e4e7eb; font-weight: 500; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.9rem; border: 1px solid transparent; cursor: pointer; transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-ghost:hover { background: #1c2230; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Standard content container with tonal depth and subtle border.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Título de sección</h3><p class=\"ds-card-body\">Contenido de la tarjeta aquí.</p></div>",
+      "css": ".ds-card { background: #161b27; border: 1px solid #232a39; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.3); border-radius: 14px; padding: 16px; } .ds-card-title { font-weight: 700; font-size: 1.25rem; line-height: 1.3; color: #e4e7eb; margin: 0 0 8px 0; } .ds-card-body { font-size: 15px; line-height: 1.6; color: #9ba3b0; margin: 0; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard text input with elevated background and focus glow.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Buscar ramo...\" />",
+      "css": ".ds-input { width: 100%; padding: 10px 12px; border: 1px solid #232a39; border-radius: 6px; background: #11151f; color: #e4e7eb; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.95rem; transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-input:focus { outline: none; border-color: #6b7a99; box-shadow: 0 0 0 3px rgba(107, 122, 153, 0.12); } .ds-input::placeholder { color: #5e6675; }"
+    },
+    {
+      "name": "Priority Chip",
+      "kind": "chip",
+      "refersTo": "chip-priority",
+      "description": "Dusty rose chip for P0 mandatory courses.",
+      "html": "<span class=\"ds-chip-priority\">Prioridad</span>",
+      "css": ".ds-chip-priority { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 14px; background: #3a2530; color: #b87a96; font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; border: 1px solid rgba(184, 122, 150, 0.2); }"
+    },
+    {
+      "name": "Optional Chip",
+      "kind": "chip",
+      "refersTo": "chip-optional",
+      "description": "Warm gold chip for P1 optional courses.",
+      "html": "<span class=\"ds-chip-optional\">Opcionales</span>",
+      "css": ".ds-chip-optional { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 14px; background: #3d3625; color: #c4a87a; font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; border: 1px solid rgba(196, 168, 122, 0.2); }"
+    },
+    {
+      "name": "Elective Chip",
+      "kind": "chip",
+      "refersTo": "chip-elective",
+      "description": "Muted teal chip for P2 elective courses.",
+      "html": "<span class=\"ds-chip-elective\">Electivos</span>",
+      "css": ".ds-chip-elective { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 14px; background: #253838; color: #7a9999; font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; border: 1px solid rgba(122, 153, 153, 0.2); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Scholar's Desk",
+    "overview": "The ecosystem aspires to feel like a well-organized academic workspace — serious enough to trust with consequential decisions (your semester schedule matters), but warm enough to stay in for an hour without fatigue. Technical elegance is the guiding aesthetic: precision in layout and information hierarchy, with a subtle warmth that comes from the gold accent and muted, human-friendly color choices. The dark theme is not 'dark mode as afterthought' — it's the native habitat, designed for late-night study sessions where the interface recedes and the data leads.",
+    "keyCharacteristics": [
+      "Muted, desaturated palette — no neon, no saturated primaries; every color earns its place",
+      "Tonal layering over heavy shadows; depth comes from background hierarchy, not drop shadows",
+      "Warm gold accent as the single point of visual energy — used sparingly, never overwhelming",
+      "Typography-first hierarchy; information density without clutter",
+      "Shared token vocabulary across all apps; UniHorario's visual language is the ecosystem standard"
+    ],
+    "rules": [
+      { "name": "The Gold Accent Rule", "body": "Warm Gold appears on ≤15% of any given screen. Its rarity is the point — it draws the eye to what matters most (category chips, accent highlights) without competing with the data.", "section": "colors" },
+      { "name": "The Muted Palette Rule", "body": "Every color in this system is desaturated by at least 30% from its pure hue. If a color looks vibrant, it's wrong. The palette earns trust through restraint.", "section": "colors" },
+      { "name": "The No-Caps Exception Rule", "body": "Text is never ALL CAPS except schedule grid day/time headers and category chip labels. When caps appear, they carry structural meaning — not decoration.", "section": "typography" },
+      { "name": "The Tonal Layer Rule", "body": "Depth is communicated through background color hierarchy (bg → bg-elevated → surface), not through shadows alone. Shadows reinforce what the tonal layering already suggests.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use the tonal layer hierarchy consistently: bg → bg-elevated → surface. Never skip a layer.",
+      "Do keep Warm Gold reserved for accent moments — category chips, highlight states, subtle emphasis.",
+      "Do use Plus Jakarta Sans for all UI text. JetBrains Mono only for time codes and NRC numbers.",
+      "Do maintain the 6/10/14/20px radius progression.",
+      "Do use ambient shadows at their documented intensities. Never add glow, neon, or colored shadows.",
+      "Do keep schedule grid cells at 56px height and 110px min-width."
+    ],
+    "donts": [
+      "Don't use saturated or vibrant colors. Every color in this system is muted.",
+      "Don't add decorative borders, double lines, or dashed borders.",
+      "Don't use ALL CAPS outside schedule grid headers and category chips.",
+      "Don't add hover animations that transform scale or add dramatic shadows.",
+      "Don't introduce new color families without mapping them to an existing tonal role.",
+      "Don't use the primary color (steel blue) for large background fills."
+    ]
+  }
+}
