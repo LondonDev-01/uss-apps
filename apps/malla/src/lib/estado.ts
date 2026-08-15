@@ -77,11 +77,31 @@ export function deriveCourseState(
   // prerequisites are actually met.
   const disponible = prioridades?.cursosDisponibles.find((c) => c.cursoId === curso.id)
   if (!disponible) {
+    // When prioridades loaded successfully but this course isn't in
+    // cursosDisponibles, the backend explicitly excluded it — respect that
+    // by returning 'no-dictado' (visually distinct, not clickable).
+    // When prioridades is null (endpoint failed), we can't verify server-side
+    // availability, so default to 'disponible' for courses with met prereqs.
+    if (prioridades !== null) {
+      return { status: 'no-dictado', missingPrereqs: [], opciones: [], equivalente }
+    }
     return { status: 'disponible', missingPrereqs: [], opciones: [], equivalente }
   }
 
   if (disponible.prioridad === 0) {
     if (disponible.opciones.length === 0) {
+      // Empty `opciones` has two very different causes (PLAN_V2 S5 rule 3):
+      // a) the period Excel was uploaded and this course isn't in it → truly
+      //    "no dictado" this period;
+      // b) the period has NO schedules loaded at all (horarios_disponibles
+      //    empty) → we know nothing about the offering, so labeling an
+      //    atrasado "no dictado" is wrong (and it used to dim half the malla
+      //    the moment any course was approved, since semestreActual advances).
+      // Distinguish by checking whether ANY available course has opciones.
+      const hayOfertaCargada = (prioridades?.cursosDisponibles ?? []).some((c) => c.opciones.length > 0)
+      if (!hayOfertaCargada) {
+        return { status: 'prioridad', missingPrereqs: [], opciones: [], equivalente }
+      }
       return { status: 'no-dictado', missingPrereqs: [], opciones: [], equivalente }
     }
     return { status: 'prioridad', missingPrereqs: [], opciones: disponible.opciones, equivalente }

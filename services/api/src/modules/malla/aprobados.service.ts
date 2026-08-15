@@ -32,20 +32,63 @@ export class AprobadosService {
     });
   }
 
+  // Desmarcar es en cascada: si un ramo deja de estar aprobado, todo ramo
+  // aprobado que lo tenga como prerrequisito (directo o transitivo) pierde
+  // su condición de aprobable y se desmarca también. Sin esto, la malla
+  // queda en un estado inconsistente (dependientes marcados sin su base),
+  // y el frontend no puede resolverlo solo porque la DB es la fuente de
+  // verdad (PLAN_V3 §3).
   async remove(user: AuthenticatedUser, mallaCursoId: string) {
-    try {
-      return await this.prisma.userCursoAprobado.delete({
-        where: { userId_mallaCursoId: { userId: user.id, mallaCursoId } },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
-        throw new NotFoundException('Curso aprobado de malla inexistente');
-      }
-      throw error;
+    const curso = await this.prisma.mallaCurso.findUnique({
+      where: { id: mallaCursoId },
+      select: { id: true, mallaId: true },
+    });
+    if (!curso) {
+      throw new NotFoundException('Curso de malla inexistente');
     }
+
+    const aprobado = await this.prisma.userCursoAprobado.findUnique({
+      where: { userId_mallaCursoId: { userId: user.id, mallaCursoId } },
+    });
+    if (!aprobado) {
+      throw new NotFoundException('Curso aprobado de malla inexistente');
+    }
+
+    // Cierre transitivo de dependientes dentro de la malla del curso:
+    // arista prerequisitoId -> cursoId, BFS desde el curso desmarcado.
+    const edges = await this.prisma.mallaPrerrequisito.findMany({
+      where: { curso: { mallaId: curso.mallaId } },
+      select: { cursoId: true, prerequisitoId: true },
+    });
+    const dependientes = new Map<string, string[]>();
+    for (const edge of edges) {
+      const lista = dependientes.get(edge.prerequisitoId) ?? [];
+      lista.push(edge.cursoId);
+      dependientes.set(edge.prerequisitoId, lista);
+    }
+    const cierre = new Set<string>([mallaCursoId]);
+    const cola: string[] = [mallaCursoId];
+    while (cola.length > 0) {
+      const actual = cola.shift() as string;
+      for (const dep of dependientes.get(actual) ?? []) {
+        if (!cierre.has(dep)) {
+          cierre.add(dep);
+          cola.push(dep);
+        }
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const afectados = await tx.userCursoAprobado.findMany({
+        where: { userId: user.id, mallaCursoId: { in: [...cierre] } },
+        include: { mallaCurso: true },
+        orderBy: { aprobadoEn: 'desc' },
+      });
+      await tx.userCursoAprobado.deleteMany({
+        where: { userId: user.id, mallaCursoId: { in: [...cierre] } },
+      });
+      return afectados;
+    });
   }
 
   // Solo actualiza la nota — no toca `aprobadoEn` (a diferencia de

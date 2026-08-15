@@ -10,7 +10,6 @@ import {
   fetchMallaDetalle,
   fetchPrioridades,
   removeAprobado,
-  setNota as apiSetNota,
   upsertAprobado,
   type Aprobado,
   type MallaDetalle,
@@ -37,8 +36,17 @@ export default function MallaPage() {
       setPrioridades(prioridadesResult)
       setPrioridadesFailed(false)
     } catch {
-      // Degrade gracefully: no priority distinction, just approved vs.
-      // available vs. unavailable — see PLAN_V2 §6 and src/lib/estado.ts.
+      // Retry once after a short delay — the backend may have been busy
+      // recalculating priorities after the previous approval.
+      try {
+        await new Promise((r) => setTimeout(r, 500))
+        const prioridadesResult = await fetchPrioridades(accessToken)
+        setPrioridades(prioridadesResult)
+        setPrioridadesFailed(false)
+        return
+      } catch {
+        // Second attempt also failed — degrade gracefully.
+      }
       setPrioridades(null)
       setPrioridadesFailed(true)
     }
@@ -65,8 +73,13 @@ export default function MallaPage() {
     setPendingId(cursoId)
     try {
       await upsertAprobado(accessToken, cursoId)
+      // Refetch to sync state. The retry logic inside
+      // loadAprobadosYPrioridades handles transient prioridades failures.
       await loadAprobadosYPrioridades()
     } catch {
+      // Approval failed — refetch to restore consistent state, then notify.
+      // Do NOT await loadAprobadosYPrioridades again here to avoid retry loops;
+      // the previous call already attempted the sync.
       setError('No se pudo marcar el ramo como aprobado.')
     } finally {
       setPendingId(null)
@@ -102,16 +115,6 @@ export default function MallaPage() {
     }
   }
 
-  async function handleSetNota(cursoId: string, nota: number) {
-    if (!accessToken) return
-    try {
-      await apiSetNota(accessToken, cursoId, nota)
-      await loadAprobadosYPrioridades()
-    } catch {
-      setError('No se pudo guardar la nota.')
-    }
-  }
-
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-bg text-danger px-4 text-center">
@@ -129,20 +132,10 @@ export default function MallaPage() {
   }
 
   const aprobadosIds = new Set(aprobados.map((a) => a.mallaCursoId))
-  const notaPorCurso = new Map(aprobados.map((a) => [a.mallaCursoId, a.nota]))
   const totalCursos = malla.cursos.length
   const totalAprobados = aprobadosIds.size
   const porcentaje = totalCursos > 0 ? Math.round((totalAprobados / totalCursos) * 100) : 0
   const metadatos = prioridades?.metadatos
-
-  // Simple mean of every recorded nota — not credit-weighted (this repo
-  // doesn't track créditos per ramo yet, see PLAN_V2 §0). Good enough to
-  // "start calculating the average", per the ask; revisit if a real
-  // credit-weighted promedio is needed later.
-  const notas = aprobados
-    .map((a) => (a.nota !== null ? Number(a.nota) : null))
-    .filter((n): n is number => n !== null && !Number.isNaN(n))
-  const promedio = notas.length > 0 ? notas.reduce((sum, n) => sum + n, 0) / notas.length : null
 
   return (
     <div className="min-h-screen bg-bg">
@@ -183,7 +176,7 @@ export default function MallaPage() {
           </p>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           <StatCard label="Semestre actual">
             <p className="text-2xl font-bold text-fg">{metadatos?.semestreActual ?? '—'}</p>
           </StatCard>
@@ -198,9 +191,6 @@ export default function MallaPage() {
           </StatCard>
           <StatCard label="Electivos">
             <p className="text-2xl font-bold text-fg">{metadatos?.electivos ?? '—'}</p>
-          </StatCard>
-          <StatCard label="Promedio">
-            <p className="text-2xl font-bold text-fg">{promedio !== null ? promedio.toFixed(1) : '—'}</p>
           </StatCard>
         </div>
 
@@ -217,13 +207,11 @@ export default function MallaPage() {
         <MallaGrid
           cursos={malla.cursos}
           aprobadosIds={aprobadosIds}
-          notaPorCurso={notaPorCurso}
           prioridades={prioridades}
           searchTerm={search}
           onMarkApproved={handleMarkApproved}
           onUnmarkApproved={handleUnmarkApproved}
           onMarkGroup={handleMarkGroup}
-          onSetNota={handleSetNota}
         />
 
         <div className="flex flex-wrap gap-4 text-xs text-muted">
@@ -237,9 +225,9 @@ export default function MallaPage() {
         <p className="mt-2 text-xs text-subtle">
           El color de fondo de cada ramo indica su área curricular; el borde y la opacidad indican su estado. Si
           un ramo ya no se dicta pero tiene un reemplazo en la otra malla, aparece con el nombre del reemplazo
-          entre paréntesis debajo — aprobar ese reemplazo cubre este ramo igual. Click en un ramo disponible lo
-          marca directo (sin confirmación); el ícono rojo lo desmarca; click en uno ya aprobado abre el campo
-          para poner la nota.
+          entre paréntesis debajo — aprobar ese reemplazo cubre este ramo igual. Click en un ramo lo marca como
+          aprobado (sin confirmación) y click de nuevo lo desmarca; también podés marcar uno "no dictado" este
+          período, ya que la malla registra tu historial académico.
         </p>
 
         <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted">

@@ -57,7 +57,10 @@ export class AprobadosController {
   }
 
   @Delete('me/:mallaCursoId')
-  @ApiOperation({ summary: 'Quita un curso aprobado' })
+  @ApiOperation({
+    summary:
+      'Quita un curso aprobado y, en cascada, todos los cursos aprobados que dependen de él como prerrequisito',
+  })
   remove(@Req() req: Request, @Param('mallaCursoId') mallaCursoId: string) {
     return this.aprobadosService.remove(
       req.user as AuthenticatedUser,
